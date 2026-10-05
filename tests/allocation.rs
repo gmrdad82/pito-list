@@ -1,0 +1,130 @@
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    cell::Cell as Counter,
+};
+
+use pito_list::{Cell, Column, Key, Keys, List, ListView, Mark, Row, Step, Styles};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Modifier, Style},
+    widgets::Widget,
+};
+
+struct Counting;
+
+thread_local! {
+    static COUNTING: Counter<bool> = const { Counter::new(false) };
+    static COUNT: Counter<usize> = const { Counter::new(0) };
+}
+
+fn note() {
+    if COUNTING.with(Counter::get) {
+        COUNT.with(|count| count.set(count.get() + 1));
+    }
+}
+
+unsafe impl GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        note();
+        unsafe { System.alloc(layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(ptr, layout) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        note();
+        unsafe { System.realloc(ptr, layout, size) }
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: Counting = Counting;
+
+fn allocations(work: impl FnOnce()) -> usize {
+    COUNT.with(|count| count.set(0));
+    COUNTING.with(|counting| counting.set(true));
+    work();
+    COUNTING.with(|counting| counting.set(false));
+    COUNT.with(Counter::get)
+}
+
+const ACCENT: Style = Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD);
+const DIM: Style = Style::new().add_modifier(Modifier::DIM);
+
+#[test]
+fn drawing_allocates_nothing() {
+    assert!(allocations(|| drop(std::hint::black_box(Vec::<u8>::with_capacity(8)))) > 0);
+    let styles = Styles::new().selected(ACCENT).faint(DIM);
+    let columns = [
+        Column::new("Name", 8, 14).pinned(),
+        Column::new("Version", 6, 10).priority(3),
+        Column::new("Owner", 5, 8).priority(1),
+        Column::new("Message", 8, 0),
+    ];
+    let rows: Vec<Row> = (0..500)
+        .map(|n| {
+            Row::new([
+                Cell::new(format!("ținută {n} 日本語")),
+                Cell::new("v1 → v2").faint(),
+                Cell::new("owner").style(Style::new().fg(Color::Green)),
+                Cell::new("a long message that never fits\nin one line at all, however wide"),
+            ])
+            .mark(Mark::new("⧗").style(DIM))
+        })
+        .collect();
+    let mut list = List::new().keys(Keys::VIM).with_rows(rows);
+    let sizes = [
+        (150, 40),
+        (80, 12),
+        (40, 6),
+        (24, 3),
+        (6, 2),
+        (1, 1),
+        (0, 0),
+    ];
+    let mut buffers: Vec<Buffer> = sizes
+        .iter()
+        .map(|&(width, height)| Buffer::empty(Rect::new(0, 0, width, height)))
+        .collect();
+    let counted = allocations(|| {
+        for round in 0..30usize {
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                for header in [false, true] {
+                    ListView::new(&mut list, &columns)
+                        .styles(styles)
+                        .header(header)
+                        .end(Some("· end ·"))
+                        .empty(Some("Nothing."))
+                        .render(area, buffer);
+                }
+                std::hint::black_box(list.hit(area, true, 3, 3));
+            }
+            let key = [
+                Key::Down,
+                Key::Char('j'),
+                Key::PageDown,
+                Key::Char('G'),
+                Key::Home,
+                Key::Tab,
+            ][round % 6];
+            assert_ne!(list.key(key), Step::Open(0));
+        }
+    });
+    assert_eq!(counted, 0);
+    let mut empty = List::new();
+    let counted = allocations(|| {
+        for buffer in &mut buffers {
+            let area = buffer.area;
+            ListView::new(&mut empty, &columns)
+                .styles(styles)
+                .header(true)
+                .empty(Some("Nothing."))
+                .render(area, buffer);
+        }
+    });
+    assert_eq!(counted, 0);
+}

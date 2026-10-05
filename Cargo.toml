@@ -1,0 +1,21 @@
+[package]
+name = "pito-list"
+version = "0.1.0"
+authors = ["Gamer Dad"]
+edition = "2024"
+description = "Selectable list rows for ratatui apps: a bold marker on the selected row, padded columns that drop by priority, a clipped last column, scrolling, paging and click hits"
+license = "MIT"
+repository = "https://github.com/gmrdad82/pito-list"
+publish = false
+
+[lib]
+name = "pito_list"
+
+[features]
+crossterm = ["dep:crossterm"]
+
+[dependencies]
+crossterm = { version = "0.29", default-features = false, features = ["events"], optional = true }
+ratatui = { version = "0.30", default-features = false }
+unicode-segmentation = "1"
+unicode-width = "0.2"
