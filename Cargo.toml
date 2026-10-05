@@ -1,6 +1,6 @@
 [package]
 name = "pito-list"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Gamer Dad"]
 edition = "2024"
 description = "Selectable list rows for ratatui apps: a bold marker on the selected row, padded columns that drop by priority, a clipped last column, scrolling, paging and click hits"

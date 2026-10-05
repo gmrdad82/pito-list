@@ -8,7 +8,7 @@ backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.1.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.2.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -33,6 +33,10 @@ some platforms, so diacritics can still be typed.
   `pinned()` column drops never, and a column that is left shrinks no
   further than its minimum. Spare width goes to the columns up to their
   preferred widths, left to right.
+- **Right-aligned columns.** `right()` pads a column on the left instead of the
+  right, for numbers: its cells and its header title end at the column's right
+  edge. A text wider than the column is clipped with "…" just as in a
+  left-aligned one.
 - **The last column takes what's left** (a message, say), is never dropped
   and is clipped with "…". Its minimum is always kept free, and its preferred
   width isn't used.
@@ -43,6 +47,13 @@ some platforms, so diacritics can still be typed.
 - **An optional header line** of the column titles, an optional end line (the
   app's words, say "· end ·") after the last row, and an optional line for an
   empty list, all in the faint style.
+- **A base style.** Drawing clears every cell of its area to the app's base
+  style (none by default, so the terminal's own background shows), so an app
+  that paints a page background keeps it under the list: in the column gaps,
+  the padding, the two marker cells of the other rows and the lines below the
+  end. Every other style is drawn over it, and the selected row's style wins
+  on its row: the base shows through only what the selected style leaves
+  unset.
 - **Keys in, steps out.** `List::key(Key)` takes the crate's own `Key` and
   returns a `Step`: `Moved`, `Held` (a list key that moved nothing, such as up
   on the first row), `Open(index)` for the open key, or `Pass` for a key that
@@ -65,11 +76,12 @@ some platforms, so diacritics can still be typed.
 ```text
 pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
                Left, Right, Up, Down, Home, End, PageUp, PageDown, Delete, Other }   // non_exhaustive
-pub struct Styles { selected, ink, faint }     // non_exhaustive; Styles::new().selected(..).faint(..)
+pub struct Styles { selected, ink, faint, base }   // non_exhaustive
+  Styles::new(); .selected(Style) .ink(Style) .faint(Style) .base(Style)
 Cell::new(text) | From<&str> | From<String>; .faint() .style(Style); text()
 Mark::new(text);                              .faint() .style(Style); text()
 Row::new(cells).mark(Mark); cells(), leading()
-Column::new(title, min, preferred).priority(u8).pinned()
+Column::new(title, min, preferred).priority(u8).pinned().right()
 pub struct Keys { up, down, page_up, page_down, first, last, open: &'static [Key] }   // non_exhaustive
   Keys::new(), Keys::VIM; .up(..) .down(..) .page_up(..) .page_down(..) .first(..) .last(..) .open(..)
 pub enum Step { Pass, Held, Moved, Open(usize) }                                      // non_exhaustive
@@ -104,10 +116,11 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 
-const COLUMNS: [Column; 4] = [
+const COLUMNS: [Column; 5] = [
     Column::new("Operation", 10, 18).pinned(),
     Column::new("Version", 8, 12).priority(2),
     Column::new("Owner", 5, 10).priority(1),
+    Column::new("Size", 4, 8).priority(3).right(),
     Column::new("Message", 8, 0),
 ];
 
@@ -117,10 +130,11 @@ fn rows() -> Vec<Row> {
             Cell::new("deploy api"),
             Cell::new("v1 → v2").faint(),
             Cell::new("billing"),
+            Cell::new("12 MB").faint(),
             Cell::new("uploading the bundle"),
         ])
         .mark(Mark::new("⧗").style(Style::new().fg(Color::Yellow))),
-        Row::new(["update tool", "0.1 → 0.2", "tools", "finished"])
+        Row::new(["update tool", "0.1 → 0.2", "tools", "640 kB", "finished"])
             .mark(Mark::new("✓").style(Style::new().fg(Color::Green))),
     ]
 }
@@ -135,7 +149,8 @@ fn key(list: &mut List, key: Key) -> Option<usize> {
 fn draw(frame: &mut Frame, list: &mut List) {
     let styles = Styles::new()
         .selected(Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD))
-        .faint(Style::new().add_modifier(Modifier::DIM));
+        .faint(Style::new().add_modifier(Modifier::DIM))
+        .base(Style::new().bg(Color::Black));
     let view = ListView::new(list, &COLUMNS)
         .styles(styles)
         .header(true)

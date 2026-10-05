@@ -6,6 +6,7 @@ pub struct Column<'a> {
     pub(crate) preferred: u16,
     pub(crate) rank: u8,
     pub(crate) pinned: bool,
+    pub(crate) right: bool,
 }
 
 impl<'a> Column<'a> {
@@ -16,6 +17,7 @@ impl<'a> Column<'a> {
             preferred,
             rank: 0,
             pinned: false,
+            right: false,
         }
     }
 
@@ -26,6 +28,11 @@ impl<'a> Column<'a> {
 
     pub const fn pinned(mut self) -> Self {
         self.pinned = true;
+        self
+    }
+
+    pub const fn right(mut self) -> Self {
+        self.right = true;
         self
     }
 }

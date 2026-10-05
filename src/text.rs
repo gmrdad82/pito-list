@@ -17,15 +17,15 @@ pub(crate) fn width(text: &str) -> usize {
         .fold(0usize, |total, (_, cells)| total.saturating_add(cells))
 }
 
-fn fits(text: &str, room: usize) -> bool {
+fn within(text: &str, room: usize) -> Option<usize> {
     let mut used = 0usize;
     for (_, cells) in text.graphemes(true).filter_map(glyph) {
         used = used.saturating_add(cells);
         if used > room {
-            return false;
+            return None;
         }
     }
-    true
+    Some(used)
 }
 
 pub(crate) fn cells(text: &str) -> u16 {
@@ -55,7 +55,7 @@ pub(crate) fn put(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style
     if room == 0 {
         return;
     }
-    let overflow = !fits(text, room);
+    let overflow = within(text, room).is_none();
     let limit = if overflow { room - 1 } else { room };
     let mut used = 0usize;
     for (grapheme, cells) in text.graphemes(true).filter_map(glyph) {
@@ -73,4 +73,11 @@ pub(crate) fn put(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style
         let at = x.saturating_add(u16::try_from(used).unwrap_or(u16::MAX));
         buf.set_stringn(at, y, ELLIPSIS, 1, style);
     }
+}
+
+pub(crate) fn put_right(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style: Style) {
+    let visible = usize::from(room.min(buf.area.right().saturating_sub(x)));
+    let shift = within(text, visible).map_or(0, |used| visible - used);
+    let shift = u16::try_from(shift).unwrap_or(0);
+    put(buf, x.saturating_add(shift), y, room - shift, text, style);
 }

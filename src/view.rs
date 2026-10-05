@@ -3,7 +3,7 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 use crate::{
     Column, List, Row,
     row::Paint,
-    text::{self, blank, put},
+    text::{self, blank, put, put_right},
 };
 
 pub const CURSOR: &str = "▌ ";
@@ -16,6 +16,7 @@ pub struct Styles {
     pub(crate) selected: Style,
     pub(crate) ink: Style,
     pub(crate) faint: Style,
+    pub(crate) base: Style,
 }
 
 impl Styles {
@@ -24,6 +25,7 @@ impl Styles {
             selected: Style::new(),
             ink: Style::new(),
             faint: Style::new(),
+            base: Style::new(),
         }
     }
 
@@ -39,6 +41,11 @@ impl Styles {
 
     pub const fn faint(mut self, style: Style) -> Self {
         self.faint = style;
+        self
+    }
+
+    pub const fn base(mut self, style: Style) -> Self {
+        self.base = style;
         self
     }
 
@@ -60,6 +67,7 @@ impl Default for Styles {
 struct Layout {
     widths: [u16; MAX_COLUMNS],
     kept: [bool; MAX_COLUMNS],
+    right: [bool; MAX_COLUMNS],
     count: usize,
 }
 
@@ -73,8 +81,12 @@ impl Layout {
         let mut layout = Layout {
             widths: [0; MAX_COLUMNS],
             kept: [false; MAX_COLUMNS],
+            right: [false; MAX_COLUMNS],
             count,
         };
+        for (right, column) in layout.right.iter_mut().zip(columns) {
+            *right = column.right;
+        }
         if count == 0 {
             return layout;
         }
@@ -143,7 +155,11 @@ fn columns_line<'r>(
         }
         let size = layout.widths[at];
         if let Some((text, style)) = cell(at) {
-            put(buf, x, y, size, text, style);
+            if layout.right[at] {
+                put_right(buf, x, y, size, text, style);
+            } else {
+                put(buf, x, y, size, text, style);
+            }
         }
         x = x.saturating_add(size).saturating_add(gap);
     }
@@ -208,6 +224,7 @@ impl<'a> ListView<'a> {
 
 struct Line<'a> {
     styles: Styles,
+    chosen: Style,
     layout: Layout,
     gap: u16,
     indent: u16,
@@ -223,7 +240,7 @@ impl Line<'_> {
         let mut x = area.x;
         let room = area.width;
         if chosen {
-            blank(buf, x, y, room, self.styles.selected);
+            blank(buf, x, y, room, self.chosen);
             put(buf, x, y, self.indent, self.cursor, self.styles.selected);
         }
         x = x.saturating_add(self.indent);
@@ -267,9 +284,6 @@ impl Widget for ListView<'_> {
         if area.is_empty() {
             return;
         }
-        for y in area.top()..area.bottom() {
-            blank(buf, area.x, y, area.width, Style::new());
-        }
         let ListView {
             list,
             columns,
@@ -280,6 +294,9 @@ impl Widget for ListView<'_> {
             end,
             empty,
         } = self;
+        for y in area.top()..area.bottom() {
+            blank(buf, area.x, y, area.width, styles.base);
+        }
         let indent = text::cells(cursor);
         let mark_width = list.mark_width();
         let lead = indent
@@ -287,6 +304,7 @@ impl Widget for ListView<'_> {
             .saturating_add(u16::from(mark_width > 0));
         let line = Line {
             styles,
+            chosen: styles.base.patch(styles.selected),
             layout: Layout::new(columns, area.width, lead, gap),
             gap,
             indent,

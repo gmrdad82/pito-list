@@ -128,3 +128,47 @@ fn drawing_allocates_nothing() {
     });
     assert_eq!(counted, 0);
 }
+
+#[test]
+fn a_base_and_right_columns_allocate_nothing() {
+    let styles = Styles::new()
+        .selected(ACCENT)
+        .faint(DIM)
+        .base(Style::new().fg(Color::White).bg(Color::Blue));
+    let columns = [
+        Column::new("Name", 8, 14).pinned(),
+        Column::new("Size", 4, 10).priority(2).right(),
+        Column::new("Owner", 5, 8).priority(1),
+        Column::new("Total", 3, 0).right(),
+    ];
+    let rows: Vec<Row> = (0..500)
+        .map(|n| {
+            Row::new([
+                Cell::new(format!("ținută {n} 日本語")),
+                Cell::new(format!("{}", n * 1024)).faint(),
+                Cell::new("owner"),
+                Cell::new("1234567890 ".repeat(n % 7)),
+            ])
+            .mark(Mark::new("⧗").style(DIM))
+        })
+        .collect();
+    let mut list = List::new().with_rows(rows);
+    let mut buffers: Vec<Buffer> = [(150, 40), (40, 6), (12, 3), (1, 1), (0, 0)]
+        .iter()
+        .map(|&(width, height)| Buffer::empty(Rect::new(0, 0, width, height)))
+        .collect();
+    let counted = allocations(|| {
+        for round in 0..30usize {
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                ListView::new(&mut list, &columns)
+                    .styles(styles)
+                    .header(round % 2 == 0)
+                    .end(Some("· end ·"))
+                    .render(area, buffer);
+            }
+            list.key(Key::PageDown);
+        }
+    });
+    assert_eq!(counted, 0);
+}
