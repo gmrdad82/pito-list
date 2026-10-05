@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use ratatui::layout::Rect;
 
-use crate::{Key, Row, text};
+use crate::{Key, Row, row::Kind};
 
 const PAGE: usize = 10;
 
@@ -90,14 +92,59 @@ pub enum Step {
     Open(usize),
 }
 
+pub trait Source {
+    fn len(&self) -> usize;
+
+    fn row(&self, index: usize) -> Cow<'_, Row>;
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn selectable(&self, index: usize) -> bool {
+        self.row(index).selectable()
+    }
+
+    fn mark_width(&self) -> u16 {
+        0
+    }
+}
+
+impl Source for Vec<Row> {
+    fn len(&self) -> usize {
+        <[Row]>::len(self)
+    }
+
+    fn row(&self, index: usize) -> Cow<'_, Row> {
+        Cow::Borrowed(&self[index])
+    }
+
+    fn selectable(&self, index: usize) -> bool {
+        self[index].selectable()
+    }
+
+    fn mark_width(&self) -> u16 {
+        self.iter().map(Row::mark_width).max().unwrap_or(0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum Paging {
+    #[default]
+    Cursor,
+    View,
+}
+
 #[derive(Debug, Clone)]
-pub struct List {
-    rows: Vec<Row>,
+pub struct List<S = Vec<Row>> {
+    source: S,
     selected: usize,
     top: usize,
     page: usize,
     mark_width: u16,
     keys: Keys,
+    paging: Paging,
 }
 
 impl Default for List {
@@ -108,19 +155,7 @@ impl Default for List {
 
 impl List {
     pub fn new() -> Self {
-        List {
-            rows: Vec::new(),
-            selected: 0,
-            top: 0,
-            page: PAGE,
-            mark_width: 0,
-            keys: Keys::new(),
-        }
-    }
-
-    pub fn keys(mut self, keys: Keys) -> Self {
-        self.keys = keys;
-        self
+        List::from_source(Vec::new())
     }
 
     pub fn with_rows(mut self, rows: impl IntoIterator<Item = Row>) -> Self {
@@ -129,55 +164,106 @@ impl List {
     }
 
     pub fn set_rows(&mut self, rows: impl IntoIterator<Item = Row>) {
-        self.rows.clear();
+        self.source.clear();
         self.mark_width = 0;
         for row in rows {
             self.push(row);
         }
-        self.selected = self.selected.min(self.rows.len().saturating_sub(1));
-        self.top = self.top.min(self.rows.len().saturating_sub(1));
+        self.settle();
     }
 
     pub fn push(&mut self, row: Row) {
-        if let Some(mark) = &row.mark {
-            self.mark_width = self.mark_width.max(text::cells(&mark.text));
-        }
-        self.rows.push(row);
+        self.mark_width = self.mark_width.max(row.mark_width());
+        self.source.push(row);
     }
 
     pub fn clear(&mut self) {
-        self.rows.clear();
+        self.source.clear();
         self.mark_width = 0;
         self.selected = 0;
         self.top = 0;
     }
 
-    pub fn len(&self) -> usize {
-        self.rows.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-
     pub fn rows(&self) -> &[Row] {
-        &self.rows
-    }
-
-    pub fn selected(&self) -> Option<usize> {
-        (!self.rows.is_empty()).then_some(self.selected)
+        &self.source
     }
 
     pub fn selected_row(&self) -> Option<&Row> {
-        self.rows.get(self.selected)
+        self.source.get(self.selected()?)
+    }
+}
+
+impl<S: Source> List<S> {
+    pub fn from_source(source: S) -> Self {
+        let mark_width = source.mark_width();
+        List {
+            source,
+            selected: 0,
+            top: 0,
+            page: PAGE,
+            mark_width,
+            keys: Keys::new(),
+            paging: Paging::Cursor,
+        }
+    }
+
+    pub fn keys(mut self, keys: Keys) -> Self {
+        self.keys = keys;
+        self
+    }
+
+    pub fn paging(mut self, paging: Paging) -> Self {
+        self.paging = paging;
+        self
+    }
+
+    pub fn source(&self) -> &S {
+        &self.source
+    }
+
+    pub fn set_source(&mut self, source: S) {
+        self.source = source;
+        self.mark_width = self.source.mark_width();
+        self.settle();
+    }
+
+    pub fn update(&mut self, change: impl FnOnce(&mut S)) {
+        change(&mut self.source);
+        self.mark_width = self.source.mark_width();
+        self.settle();
+    }
+
+    fn settle(&mut self) {
+        let last = self.source.len().saturating_sub(1);
+        self.selected = self.selected.min(last);
+        self.top = self.top.min(last);
+    }
+
+    pub fn len(&self) -> usize {
+        self.source.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.source.is_empty()
+    }
+
+    pub fn selected(&self) -> Option<usize> {
+        let last = self.source.len().checked_sub(1)?;
+        let at = self.selected.min(last);
+        self.next(at).or_else(|| self.prev(at))
     }
 
     pub fn select(&mut self, index: usize) {
-        self.selected = index.min(self.rows.len().saturating_sub(1));
+        let at = index.min(self.source.len().saturating_sub(1));
+        self.selected = self.next(at).or_else(|| self.prev(at)).unwrap_or(at);
     }
 
     pub fn top(&self) -> usize {
         self.top
+    }
+
+    pub fn scroll_to(&mut self, top: usize) {
+        self.top = top.min(self.source.len().saturating_sub(1));
     }
 
     pub fn page(&self) -> usize {
@@ -188,37 +274,77 @@ impl List {
         self.mark_width
     }
 
-    fn go(&mut self, to: usize) -> Step {
-        let to = to.min(self.rows.len().saturating_sub(1));
-        if self.rows.is_empty() || to == self.selected {
+    pub(crate) fn row(&self, index: usize) -> Cow<'_, Row> {
+        self.source.row(index)
+    }
+
+    fn next(&self, from: usize) -> Option<usize> {
+        (from..self.source.len()).find(|&at| self.source.selectable(at))
+    }
+
+    fn prev(&self, from: usize) -> Option<usize> {
+        let end = from.saturating_add(1).min(self.source.len());
+        (0..end).rev().find(|&at| self.source.selectable(at))
+    }
+
+    fn go(&mut self, to: impl FnOnce(&Self, usize) -> Option<usize>) -> Step {
+        let Some(from) = self.selected() else {
             return Step::Held;
+        };
+        self.selected = from;
+        match to(self, from) {
+            Some(to) if to != from => {
+                self.selected = to;
+                Step::Moved
+            }
+            _ => Step::Held,
         }
-        self.selected = to;
-        Step::Moved
     }
 
     pub fn up(&mut self) -> Step {
-        self.go(self.selected.saturating_sub(1))
+        self.go(|list, from| list.prev(from.checked_sub(1)?))
     }
 
     pub fn down(&mut self) -> Step {
-        self.go(self.selected.saturating_add(1))
+        self.go(|list, from| list.next(from.saturating_add(1)))
     }
 
     pub fn page_up(&mut self) -> Step {
-        self.go(self.selected.saturating_sub(self.page))
+        self.flip(|list, from| {
+            let to = from.saturating_sub(list.page);
+            list.prev(to).or_else(|| list.next(to))
+        })
     }
 
     pub fn page_down(&mut self) -> Step {
-        self.go(self.selected.saturating_add(self.page))
+        self.flip(|list, from| {
+            let to = from
+                .saturating_add(list.page)
+                .min(list.source.len().saturating_sub(1));
+            list.next(to).or_else(|| list.prev(to))
+        })
+    }
+
+    fn flip(&mut self, to: impl FnOnce(&Self, usize) -> Option<usize>) -> Step {
+        let from = self.selected();
+        let step = self.go(to);
+        if let (Step::Moved, Paging::View, Some(from)) = (step, self.paging, from) {
+            let to = self.selected;
+            self.top = if to > from {
+                self.top.saturating_add(to - from)
+            } else {
+                self.top.saturating_sub(from - to)
+            };
+        }
+        step
     }
 
     pub fn first(&mut self) -> Step {
-        self.go(0)
+        self.go(|list, _| list.next(0))
     }
 
     pub fn last(&mut self) -> Step {
-        self.go(usize::MAX)
+        self.go(|list, _| list.prev(list.source.len().saturating_sub(1)))
     }
 
     pub fn key(&mut self, key: Key) -> Step {
@@ -251,28 +377,48 @@ impl List {
             return None;
         }
         let index = self.top.saturating_add(usize::from(row - first));
-        (index < self.rows.len()).then_some(index)
+        (index < self.source.len() && self.source.selectable(index)).then_some(index)
     }
 
-    pub(crate) fn follow(&mut self, height: usize, tail: bool) {
+    fn heading_above(&self, at: usize, height: usize) -> usize {
+        let reach = at.saturating_sub(height.saturating_sub(1));
+        let mut head = at;
+        for above in (reach..at).rev() {
+            let row = self.source.row(above);
+            match row.kind {
+                Kind::Item => break,
+                Kind::Heading => head = above,
+                Kind::Blank => {}
+            }
+        }
+        head
+    }
+
+    pub(crate) fn follow(&mut self, height: usize, tail: bool) -> Option<usize> {
         if height > 0 {
             self.page = height.saturating_sub(1).max(1);
         }
-        let len = self.rows.len();
+        let len = self.source.len();
         if height == 0 || len == 0 {
             self.top = 0;
-            return;
+            return None;
         }
-        self.selected = self.selected.min(len - 1);
-        let last = self.selected + 1 == len;
-        let bottom = self.selected + 1 + usize::from(last && tail);
-        if self.selected < self.top {
-            self.top = self.selected;
+        let lines = len + usize::from(tail);
+        let Some(selected) = self.selected() else {
+            self.top = self.top.min(lines.saturating_sub(height));
+            return None;
+        };
+        self.selected = selected;
+        if selected < self.top {
+            self.top = selected;
         }
+        let last = selected + 1 == len;
+        let bottom = selected + 1 + usize::from(last && tail);
         if bottom > self.top.saturating_add(height) {
             self.top = bottom - height;
         }
-        let lines = len + usize::from(tail);
+        self.top = self.top.min(self.heading_above(selected, height));
         self.top = self.top.min(lines.saturating_sub(height));
+        Some(selected)
     }
 }

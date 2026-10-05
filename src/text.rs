@@ -1,3 +1,5 @@
+use std::iter;
+
 use ratatui::{buffer::Buffer, style::Style};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -17,12 +19,14 @@ pub(crate) fn width(text: &str) -> usize {
         .fold(0usize, |total, (_, cells)| total.saturating_add(cells))
 }
 
-fn within(text: &str, room: usize) -> Option<usize> {
+fn within<'t>(runs: impl Iterator<Item = (&'t str, Style)>, room: usize) -> Option<usize> {
     let mut used = 0usize;
-    for (_, cells) in text.graphemes(true).filter_map(glyph) {
-        used = used.saturating_add(cells);
-        if used > room {
-            return None;
+    for (text, _) in runs {
+        for (_, cells) in text.graphemes(true).filter_map(glyph) {
+            used = used.saturating_add(cells);
+            if used > room {
+                return None;
+            }
         }
     }
     Some(used)
@@ -30,6 +34,10 @@ fn within(text: &str, room: usize) -> Option<usize> {
 
 pub(crate) fn cells(text: &str) -> u16 {
     u16::try_from(width(text)).unwrap_or(u16::MAX)
+}
+
+fn small(value: usize) -> u16 {
+    u16::try_from(value).unwrap_or(u16::MAX)
 }
 
 pub(crate) fn blank(buf: &mut Buffer, x: u16, y: u16, room: u16, style: Style) {
@@ -47,6 +55,20 @@ pub(crate) fn blank(buf: &mut Buffer, x: u16, y: u16, room: u16, style: Style) {
 }
 
 pub(crate) fn put(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style: Style) {
+    put_runs(buf, x, y, room, iter::once((text, style)), false);
+}
+
+pub(crate) fn put_runs<'t, I>(buf: &mut Buffer, x: u16, y: u16, room: u16, runs: I, right: bool)
+where
+    I: Iterator<Item = (&'t str, Style)> + Clone,
+{
+    let (x, room) = if right {
+        let visible = usize::from(room.min(buf.area.right().saturating_sub(x)));
+        let shift = small(within(runs.clone(), visible).map_or(0, |used| visible - used));
+        (x.saturating_add(shift), room - shift)
+    } else {
+        (x, room)
+    };
     let area = buf.area;
     if y < area.top() || y >= area.bottom() || x < area.left() || x >= area.right() {
         return;
@@ -55,29 +77,24 @@ pub(crate) fn put(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style
     if room == 0 {
         return;
     }
-    let overflow = within(text, room).is_none();
+    let overflow = within(runs.clone(), room).is_none();
     let limit = if overflow { room - 1 } else { room };
     let mut used = 0usize;
-    for (grapheme, cells) in text.graphemes(true).filter_map(glyph) {
-        if cells == 0 {
-            continue;
+    let mut cut = None;
+    'runs: for (text, style) in runs {
+        for (grapheme, cells) in text.graphemes(true).filter_map(glyph) {
+            if cells == 0 {
+                continue;
+            }
+            if used.saturating_add(cells) > limit {
+                cut = Some(style);
+                break 'runs;
+            }
+            buf.set_stringn(x.saturating_add(small(used)), y, grapheme, cells, style);
+            used += cells;
         }
-        if used.saturating_add(cells) > limit {
-            break;
-        }
-        let at = x.saturating_add(u16::try_from(used).unwrap_or(u16::MAX));
-        buf.set_stringn(at, y, grapheme, cells, style);
-        used += cells;
     }
-    if overflow {
-        let at = x.saturating_add(u16::try_from(used).unwrap_or(u16::MAX));
-        buf.set_stringn(at, y, ELLIPSIS, 1, style);
+    if let (true, Some(style)) = (overflow, cut) {
+        buf.set_stringn(x.saturating_add(small(used)), y, ELLIPSIS, 1, style);
     }
-}
-
-pub(crate) fn put_right(buf: &mut Buffer, x: u16, y: u16, room: u16, text: &str, style: Style) {
-    let visible = usize::from(room.min(buf.area.right().saturating_sub(x)));
-    let shift = within(text, visible).map_or(0, |used| visible - used);
-    let shift = u16::try_from(shift).unwrap_or(0);
-    put(buf, x.saturating_add(shift), y, room - shift, text, style);
 }

@@ -1,9 +1,12 @@
 use std::{
     alloc::{GlobalAlloc, Layout, System},
+    borrow::Cow,
     cell::Cell as Counter,
 };
 
-use pito_list::{Cell, Column, Key, Keys, List, ListView, Mark, Row, Step, Styles};
+use pito_list::{
+    Cell, Column, Key, Keys, List, ListView, Mark, Paging, Part, Row, Source, Step, Styles,
+};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -171,4 +174,135 @@ fn a_base_and_right_columns_allocate_nothing() {
         }
     });
     assert_eq!(counted, 0);
+}
+
+fn grouped(n: usize) -> Row {
+    match n % 12 {
+        0 => Row::heading([
+            Part::new(format!("Group {n} ținută")).style(ACCENT),
+            Part::new(" · 10").faint(),
+        ]),
+        11 => Row::blank(),
+        5 => Row::new([Cell::new(
+            "a detail that spans the rest of the row, wider than any area here 日本語",
+        )
+        .rest()])
+        .mark(Mark::new("·")),
+        _ => Row::new([
+            Cell::parts([
+                Part::new(format!("ținută {n}")),
+                Part::new(" 日本語").faint(),
+            ]),
+            Cell::new(format!("{}", n * 1024)),
+            Cell::parts(["1", "2"]).style(Style::new().fg(Color::Green)),
+        ])
+        .mark(Mark::new("⧗").style(DIM)),
+    }
+}
+
+const GROUPED: [Column<'static>; 3] = [
+    Column::new("Name", 8, 0).flex(),
+    Column::new("Size", 4, 8).right().priority(1),
+    Column::new("Count", 3, 5).right(),
+];
+
+const KEYS: [Key; 8] = [
+    Key::Down,
+    Key::Char('k'),
+    Key::PageDown,
+    Key::PageUp,
+    Key::Char('G'),
+    Key::Home,
+    Key::Ctrl('d'),
+    Key::Enter,
+];
+
+fn sizes() -> Vec<Buffer> {
+    [(150, 40), (40, 6), (20, 2), (12, 1), (1, 1), (0, 0)]
+        .iter()
+        .map(|&(width, height)| Buffer::empty(Rect::new(0, 0, width, height)))
+        .collect()
+}
+
+#[test]
+fn sections_parts_rest_cells_a_flex_column_and_view_paging_allocate_nothing() {
+    let styles = Styles::new()
+        .selected(ACCENT)
+        .faint(DIM)
+        .base(Style::new().bg(Color::Blue));
+    let mut list = List::new()
+        .keys(Keys::VIM)
+        .paging(Paging::View)
+        .with_rows((0..600).map(grouped));
+    let mut buffers = sizes();
+    let counted = allocations(|| {
+        for round in 0..60usize {
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                ListView::new(&mut list, &GROUPED)
+                    .styles(styles)
+                    .header(round % 2 == 0)
+                    .end(Some("· end ·"))
+                    .render(area, buffer);
+                std::hint::black_box(list.hit(area, round % 2 == 0, 3, 1));
+            }
+            std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
+            if round % 5 == 0 {
+                list.scroll_to(round * 7);
+            }
+        }
+    });
+    assert_eq!(counted, 0);
+}
+
+struct Lazy {
+    len: usize,
+    built: Counter<usize>,
+    own: Counter<usize>,
+}
+
+impl Source for Lazy {
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn row(&self, index: usize) -> Cow<'_, Row> {
+        let before = COUNT.with(Counter::get);
+        let row = grouped(index);
+        self.own
+            .set(self.own.get() + COUNT.with(Counter::get) - before);
+        self.built.set(self.built.get() + 1);
+        Cow::Owned(row)
+    }
+
+    fn mark_width(&self) -> u16 {
+        1
+    }
+}
+
+#[test]
+fn a_lazy_list_allocates_only_what_its_rows_do() {
+    let mut list = List::from_source(Lazy {
+        len: 50_000,
+        built: Counter::new(0),
+        own: Counter::new(0),
+    })
+    .keys(Keys::VIM);
+    let mut buffers = sizes();
+    let counted = allocations(|| {
+        for round in 0..60usize {
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                ListView::new(&mut list, &GROUPED)
+                    .header(true)
+                    .end(Some("· end ·"))
+                    .render(area, buffer);
+            }
+            std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
+        }
+    });
+    let own = list.source().own.get();
+    assert!(own > 0);
+    assert_eq!(counted, own);
+    assert!(list.source().built.get() < 60 * 100);
 }
