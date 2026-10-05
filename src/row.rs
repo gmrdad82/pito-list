@@ -110,6 +110,33 @@ impl Cell {
         &self.text
     }
 
+    pub fn set_text(&mut self, text: &str) {
+        self.text.clear();
+        self.text.push_str(text);
+        self.runs.clear();
+    }
+
+    pub fn set_part(&mut self, index: usize, text: &str) -> bool {
+        if self.runs.is_empty() {
+            if index == 0 {
+                self.text.clear();
+                self.text.push_str(text);
+            }
+            return index == 0;
+        }
+        let Some(end) = self.runs.get(index).map(|run| run.end) else {
+            return false;
+        };
+        let start = index
+            .checked_sub(1)
+            .map_or(0, |before| self.runs[before].end);
+        self.text.replace_range(start..end, text);
+        for run in &mut self.runs[index..] {
+            run.end = run.end - (end - start) + text.len();
+        }
+        true
+    }
+
     pub(crate) fn pieces(&self) -> Pieces<'_> {
         Pieces {
             cell: self,
@@ -186,6 +213,11 @@ impl Mark {
     pub fn text(&self) -> &str {
         &self.text
     }
+
+    pub fn set_text(&mut self, text: &str) {
+        self.text.clear();
+        self.text.push_str(text);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -246,8 +278,16 @@ impl Row {
         &self.cells
     }
 
+    pub fn cells_mut(&mut self) -> &mut [Cell] {
+        &mut self.cells
+    }
+
     pub fn leading(&self) -> Option<&Mark> {
         self.mark.as_ref()
+    }
+
+    pub fn leading_mut(&mut self) -> Option<&mut Mark> {
+        self.mark.as_mut()
     }
 
     pub fn selectable(&self) -> bool {

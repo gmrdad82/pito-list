@@ -143,6 +143,9 @@ pub struct List<S = Vec<Row>> {
     top: usize,
     page: usize,
     mark_width: u16,
+    touched: Option<(usize, u16)>,
+    rescan: bool,
+    range: Option<(usize, usize)>,
     keys: Keys,
     paging: Paging,
 }
@@ -166,6 +169,8 @@ impl List {
     pub fn set_rows(&mut self, rows: impl IntoIterator<Item = Row>) {
         self.source.clear();
         self.mark_width = 0;
+        self.touched = None;
+        self.rescan = false;
         for row in rows {
             self.push(row);
         }
@@ -180,6 +185,8 @@ impl List {
     pub fn clear(&mut self) {
         self.source.clear();
         self.mark_width = 0;
+        self.touched = None;
+        self.rescan = false;
         self.selected = 0;
         self.top = 0;
     }
@@ -190,6 +197,13 @@ impl List {
 
     pub fn selected_row(&self) -> Option<&Row> {
         self.source.get(self.selected()?)
+    }
+
+    pub fn row_mut(&mut self, index: usize) -> Option<&mut Row> {
+        self.settle_marks();
+        let before = self.source.get(index)?.mark_width();
+        self.touched = Some((index, before));
+        self.source.get_mut(index)
     }
 }
 
@@ -202,6 +216,9 @@ impl<S: Source> List<S> {
             top: 0,
             page: PAGE,
             mark_width,
+            touched: None,
+            rescan: false,
+            range: None,
             keys: Keys::new(),
             paging: Paging::Cursor,
         }
@@ -224,12 +241,16 @@ impl<S: Source> List<S> {
     pub fn set_source(&mut self, source: S) {
         self.source = source;
         self.mark_width = self.source.mark_width();
+        self.touched = None;
+        self.rescan = false;
         self.settle();
     }
 
     pub fn update(&mut self, change: impl FnOnce(&mut S)) {
         change(&mut self.source);
         self.mark_width = self.source.mark_width();
+        self.touched = None;
+        self.rescan = false;
         self.settle();
     }
 
@@ -258,6 +279,19 @@ impl<S: Source> List<S> {
         self.selected = self.next(at).or_else(|| self.prev(at)).unwrap_or(at);
     }
 
+    pub fn select_range(&mut self, range: Option<(usize, usize)>) {
+        self.range = range;
+    }
+
+    pub fn range(&self) -> Option<(usize, usize)> {
+        self.range
+    }
+
+    pub(crate) fn in_range(&self, index: usize) -> bool {
+        self.range
+            .is_some_and(|(from, to)| (from.min(to)..=from.max(to)).contains(&index))
+    }
+
     pub fn top(&self) -> usize {
         self.top
     }
@@ -270,8 +304,30 @@ impl<S: Source> List<S> {
         self.page
     }
 
-    pub(crate) fn mark_width(&self) -> u16 {
+    pub(crate) fn mark_width(&mut self) -> u16 {
+        self.settle_marks();
+        if self.rescan {
+            self.mark_width = self.source.mark_width();
+            self.rescan = false;
+        }
         self.mark_width
+    }
+
+    fn settle_marks(&mut self) {
+        let Some((index, before)) = self.touched.take() else {
+            return;
+        };
+        let after = if index < self.source.len() {
+            self.source.row(index).mark_width()
+        } else {
+            0
+        };
+        if after >= self.mark_width {
+            self.mark_width = after;
+            self.rescan = false;
+        } else if before >= self.mark_width {
+            self.rescan = true;
+        }
     }
 
     pub(crate) fn row(&self, index: usize) -> Cow<'_, Row> {

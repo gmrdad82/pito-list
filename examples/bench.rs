@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
@@ -60,6 +61,8 @@ fn run<S: Source>(
     frames: u32,
     styles: Styles,
     columns: &[Column],
+    key: Option<usize>,
+    mut change: impl FnMut(&mut List<S>, u32),
 ) -> (Duration, Duration) {
     let area = Rect::new(0, 0, WIDTH, HEIGHT);
     let mut buffer = Buffer::empty(area);
@@ -67,16 +70,18 @@ fn run<S: Source>(
     let mut worst = Duration::ZERO;
     for frame in 0..frames {
         buffer.reset();
-        let key = if frame % 64 < 48 {
+        let step = if frame % 64 < 48 {
             Key::Down
         } else {
             Key::PageUp
         };
-        list.key(key);
+        list.key(step);
         let started = Instant::now();
+        change(list, frame);
         ListView::new(list, columns)
             .styles(styles)
             .header(true)
+            .key_column(key)
             .end(Some("· end ·"))
             .render(area, &mut buffer);
         let took = started.elapsed();
@@ -107,16 +112,57 @@ fn main() {
         Column::new("Message", 8, 0),
     ];
     let mut owned = List::new().with_rows((0..ROWS).map(row));
-    let (mean, worst) = run(&mut owned, frames, styles, &columns);
+    let (mean, worst) = run(&mut owned, frames, styles, &columns, None, |_, _| {});
     println!(
         "pito-list bench: {frames} frames of a {ROWS}-row list at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );
     let mut lazy = List::from_source(Grouped);
-    let (mean, worst) = run(&mut lazy, frames, styles, &columns);
+    let (mean, worst) = run(&mut lazy, frames, styles, &columns, None, |_, _| {});
     println!(
         "pito-list bench: {frames} frames of a lazy {LAZY}-row list in groups of {GROUP} at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
+        mean.as_secs_f64() * 1e6,
+        worst.as_secs_f64() * 1e6
+    );
+    let themed = styles
+        .selected(
+            Style::new()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        )
+        .header(Style::new().fg(Color::Gray).bg(Color::Indexed(236)))
+        .header_key(Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .keep_colours(true);
+    let mut text = String::with_capacity(32);
+    let marks = ["⧗", "✓", "✗"];
+    let mut rewritten = List::new().with_rows((0..ROWS).map(row));
+    let (mean, worst) = run(
+        &mut rewritten,
+        frames,
+        themed,
+        &columns,
+        Some(1),
+        |list, frame| {
+            let at = list.selected().unwrap_or(0);
+            for line in 0..4 {
+                let Some(row) = list.row_mut(at.saturating_sub(line)) else {
+                    continue;
+                };
+                text.clear();
+                let _ = write!(text, "{frame} → v{line}");
+                if let Some(cell) = row.cells_mut().get_mut(1) {
+                    cell.set_text(&text);
+                }
+                if let Some(mark) = row.leading_mut() {
+                    mark.set_text(marks[(frame as usize + line) % marks.len()]);
+                }
+            }
+            list.select_range(Some((at.saturating_sub(8), at)));
+        },
+    );
+    println!(
+        "pito-list bench: {frames} frames of a {ROWS}-row list with a range, kept colours, a styled header and four rows rewritten a frame at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );

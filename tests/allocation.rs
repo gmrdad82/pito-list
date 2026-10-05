@@ -2,6 +2,7 @@ use std::{
     alloc::{GlobalAlloc, Layout, System},
     borrow::Cow,
     cell::Cell as Counter,
+    fmt::Write,
 };
 
 use pito_list::{
@@ -305,4 +306,65 @@ fn a_lazy_list_allocates_only_what_its_rows_do() {
     assert!(own > 0);
     assert_eq!(counted, own);
     assert!(list.source().built.get() < 60 * 100);
+}
+
+const MARKS: [&str; 6] = ["⧗", "✓", "10", "9", "100", ""];
+
+fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String, round: usize) {
+    let styles = Styles::new()
+        .selected(Style::new().bg(Color::Blue).add_modifier(Modifier::BOLD))
+        .faint(DIM)
+        .base(Style::new().bg(Color::Black))
+        .header(Style::new().fg(Color::Yellow).bg(Color::DarkGray))
+        .header_key(ACCENT)
+        .keep_colours(true);
+    for step in 0..3 {
+        let index = (round * 7 + step * 211) % list.len();
+        let Some(row) = list.row_mut(index) else {
+            continue;
+        };
+        number.clear();
+        write!(number, "{} kB · row {index} ținută", round * 1031 + step).unwrap();
+        if let Some(cell) = row.cells_mut().get_mut(1) {
+            cell.set_text(number);
+        }
+        if let Some(mark) = row.leading_mut() {
+            mark.set_text(MARKS[(round + step) % MARKS.len()]);
+        }
+        if let Some(cell) = row.cells_mut().first_mut() {
+            cell.set_part(1, number);
+        }
+    }
+    let at = list.selected().unwrap_or(0);
+    list.select_range((!round.is_multiple_of(4)).then_some((at.saturating_sub(round % 9), at)));
+    for buffer in buffers.iter_mut() {
+        let area = buffer.area;
+        ListView::new(list, &GROUPED)
+            .styles(styles)
+            .header(true)
+            .key_column(Some(round % 4))
+            .end(Some("· end ·"))
+            .render(area, buffer);
+    }
+    std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
+}
+
+#[test]
+fn a_frame_that_rewrites_cells_and_marks_and_draws_a_range_and_header_styles_allocates_nothing() {
+    let mut list = List::new().keys(Keys::VIM).with_rows((0..600).map(grouped));
+    let mut buffers = sizes();
+    let mut number = String::with_capacity(64);
+    let cold = allocations(|| {
+        for round in 0..90 {
+            rewrite_and_draw(&mut list, &mut buffers, &mut number, round);
+        }
+    });
+    assert!(cold > 0);
+    let counted = allocations(|| {
+        for round in 0..90 {
+            rewrite_and_draw(&mut list, &mut buffers, &mut number, round);
+        }
+    });
+    assert_eq!(counted, 0);
+    assert_eq!(list.len(), 600);
 }

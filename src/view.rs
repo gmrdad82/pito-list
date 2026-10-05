@@ -19,6 +19,9 @@ pub struct Styles {
     pub(crate) ink: Style,
     pub(crate) faint: Style,
     pub(crate) base: Style,
+    pub(crate) header: Option<Style>,
+    pub(crate) header_key: Option<Style>,
+    pub(crate) keep: bool,
 }
 
 impl Styles {
@@ -28,6 +31,9 @@ impl Styles {
             ink: Style::new(),
             faint: Style::new(),
             base: Style::new(),
+            header: None,
+            header_key: None,
+            keep: false,
         }
     }
 
@@ -48,6 +54,21 @@ impl Styles {
 
     pub const fn base(mut self, style: Style) -> Self {
         self.base = style;
+        self
+    }
+
+    pub const fn header(mut self, style: Style) -> Self {
+        self.header = Some(style);
+        self
+    }
+
+    pub const fn header_key(mut self, style: Style) -> Self {
+        self.header_key = Some(style);
+        self
+    }
+
+    pub const fn keep_colours(mut self, keep: bool) -> Self {
+        self.keep = keep;
         self
     }
 
@@ -180,6 +201,7 @@ pub struct ListView<'a, S = Vec<Row>> {
     cursor: &'a str,
     gap: u16,
     header: bool,
+    key: Option<usize>,
     end: Option<&'a str>,
     empty: Option<&'a str>,
 }
@@ -193,6 +215,7 @@ impl<'a, S: Source> ListView<'a, S> {
             cursor: CURSOR,
             gap: GAP,
             header: false,
+            key: None,
             end: None,
             empty: None,
         }
@@ -215,6 +238,11 @@ impl<'a, S: Source> ListView<'a, S> {
 
     pub fn header(mut self, header: bool) -> Self {
         self.header = header;
+        self
+    }
+
+    pub fn key_column(mut self, column: Option<usize>) -> Self {
+        self.key = column;
         self
     }
 
@@ -241,29 +269,39 @@ struct Line<'a> {
     area: Rect,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lit {
+    No,
+    Range,
+    Cursor,
+}
+
 impl Line<'_> {
     fn paint(&self, paint: Paint, chosen: bool) -> Style {
-        if chosen {
-            self.styles.selected
-        } else {
-            self.styles.resolve(paint)
+        match (chosen, self.styles.keep) {
+            (false, _) => self.styles.resolve(paint),
+            (true, false) => self.styles.selected,
+            (true, true) => self.styles.resolve(paint).patch(self.styles.selected),
         }
     }
 
-    fn row(&self, buf: &mut Buffer, y: u16, row: &Row, chosen: bool) {
+    fn row(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) {
         match row.kind {
-            Kind::Item => self.item(buf, y, row, chosen),
+            Kind::Item => self.item(buf, y, row, lit),
             Kind::Heading => self.heading(buf, y, row),
             Kind::Blank => {}
         }
     }
 
-    fn item(&self, buf: &mut Buffer, y: u16, row: &Row, chosen: bool) {
+    fn item(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) {
         let area = self.area;
         let mut x = area.x;
         let room = area.width;
+        let chosen = lit != Lit::No;
         if chosen {
             blank(buf, x, y, room, self.chosen);
+        }
+        if lit == Lit::Cursor {
             put(buf, x, y, self.indent, self.cursor, self.styles.selected);
         }
         x = x.saturating_add(self.indent);
@@ -299,10 +337,25 @@ impl Line<'_> {
         put_runs(buf, x, y, room, runs, false);
     }
 
-    fn header(&self, buf: &mut Buffer, y: u16, columns: &[Column]) {
+    fn header(&self, buf: &mut Buffer, y: u16, columns: &[Column], key: Option<usize>) {
+        let styles = self.styles;
+        if let Some(style) = styles.header {
+            blank(
+                buf,
+                self.area.x,
+                y,
+                self.area.width,
+                styles.base.patch(style),
+            );
+        }
+        let title = styles.header.unwrap_or(styles.faint);
         let x = self.area.x.saturating_add(self.lead);
         columns_line(buf, y, x, self.area.right(), &self.layout, self.gap, |at| {
-            Some((iter::once((columns[at].title, self.styles.faint)), false))
+            let style = match styles.header_key {
+                Some(style) if key == Some(at) => style,
+                _ => title,
+            };
+            Some((iter::once((columns[at].title, style)), false))
         });
     }
 
@@ -326,6 +379,7 @@ impl<S: Source> Widget for ListView<'_, S> {
             cursor,
             gap,
             header,
+            key,
             end,
             empty,
         } = self;
@@ -350,7 +404,7 @@ impl<S: Source> Widget for ListView<'_, S> {
         };
         let mut y = area.y;
         if header {
-            line.header(buf, y, columns);
+            line.header(buf, y, columns, key);
             y += 1;
         }
         let height = usize::from(area.bottom().saturating_sub(y));
@@ -368,7 +422,14 @@ impl<S: Source> Widget for ListView<'_, S> {
             let index = list.top().saturating_add(offset);
             let at = y.saturating_add(small(offset));
             if index < len {
-                line.row(buf, at, &list.row(index), selected == Some(index));
+                let lit = if selected == Some(index) {
+                    Lit::Cursor
+                } else if list.in_range(index) {
+                    Lit::Range
+                } else {
+                    Lit::No
+                };
+                line.row(buf, at, &list.row(index), lit);
                 continue;
             }
             if let Some(text) = end
