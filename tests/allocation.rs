@@ -309,6 +309,13 @@ fn a_lazy_list_allocates_only_what_its_rows_do() {
 }
 
 const MARKS: [&str; 6] = ["⧗", "✓", "10", "9", "100", ""];
+const HEAT: [Color; 5] = [
+    Color::Green,
+    Color::Yellow,
+    Color::LightRed,
+    Color::Red,
+    Color::Rgb(0xff, 0x5f, 0x00),
+];
 
 fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String, round: usize) {
     let styles = Styles::new()
@@ -325,16 +332,33 @@ fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String
         };
         number.clear();
         write!(number, "{} kB · row {index} ținută", round * 1031 + step).unwrap();
+        let warm = Style::new().fg(HEAT[(round + step) % HEAT.len()]);
         if let Some(cell) = row.cells_mut().get_mut(1) {
             cell.set_text(number);
+            cell.set_style(warm);
         }
         if let Some(mark) = row.leading_mut() {
             mark.set_text(MARKS[(round + step) % MARKS.len()]);
+            mark.set_style(warm);
         }
         if let Some(cell) = row.cells_mut().first_mut() {
             cell.set_part(1, number);
+            cell.set_part_style(1, warm);
+            cell.set_part_style(0, warm.add_modifier(Modifier::BOLD));
+            cell.set_part_style(2, warm);
         }
     }
+    list.update(|rows| {
+        let warm = Style::new().fg(HEAT[round % HEAT.len()]);
+        for row in rows.iter_mut().skip(round % 12).step_by(12) {
+            if let Some(cell) = row.cells_mut().last_mut() {
+                cell.set_style(warm);
+            }
+            if let Some(mark) = row.leading_mut() {
+                mark.set_style(warm.add_modifier(Modifier::DIM));
+            }
+        }
+    });
     let at = list.selected().unwrap_or(0);
     list.select_range((!round.is_multiple_of(4)).then_some((at.saturating_sub(round % 9), at)));
     for buffer in buffers.iter_mut() {
@@ -350,7 +374,8 @@ fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String
 }
 
 #[test]
-fn a_frame_that_rewrites_cells_and_marks_and_draws_a_range_and_header_styles_allocates_nothing() {
+fn a_frame_that_rewrites_and_restyles_cells_and_marks_and_draws_a_range_and_header_styles_allocates_nothing()
+ {
     let mut list = List::new().keys(Keys::VIM).with_rows((0..600).map(grouped));
     let mut buffers = sizes();
     let mut number = String::with_capacity(64);

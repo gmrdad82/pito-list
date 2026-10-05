@@ -8,7 +8,7 @@ backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.4.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.5.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -118,6 +118,22 @@ some platforms, so diacritics can still be typed.
   part in the cell's style; `set_part(index, text)` rewrites one part (a
   heading's count, say), keeps every part's style, and answers `false` for a
   part that isn't there (a plain cell is one part).
+- **Styles changed in place.** `Cell::set_style(style)`,
+  `Cell::set_part_style(index, style)` and `Mark::set_style(style)` recolour a
+  cell, one part or a mark between draws (a number drawn warmer as it rises,
+  say) and leave its text and buffers alone, so they allocate nothing either.
+  A style set this way replaces the paint that was there: the ink a cell or
+  mark takes by default and `faint()` both stand for the list's
+  `Styles::ink` and `Styles::faint` at each draw, while an explicit style
+  (set here or with `style(..)`) draws as given over the base, whatever those
+  say. To go back to the look of ink or faint, set the style the list's
+  `Styles` gives them. On a cell of parts, `set_style` is the style of every part without its own, as with
+  `Cell::parts(..).style(..)`; a part's own style stays. `set_part_style`
+  restyles one part, replacing its own style or its `faint()`, and answers
+  `false` for a part that isn't there; a plain cell is one part, at index 0,
+  where it sets the cell's style. The selected row and the range draw a
+  restyled cell like any other: in the selected style, or with the selected
+  style patched over it under `keep_colours(true)`.
 - **Keys in, steps out.** `List::key(Key)` takes the crate's own `Key` and
   returns a `Step`: `Moved`, `Held` (a list key that moved nothing, such as up
   on the first row), `Open(index)` for the open key, or `Pass` for a key that
@@ -149,8 +165,8 @@ pub struct Styles { selected, ink, faint, base, header, header_key, keep }   // 
 Part::new(text) | From<&str> | From<String>;  .faint() .style(Style); text()
 Cell::new(text) | Cell::parts(parts) | From<&str> | From<String>;
                                               .faint() .style(Style) .rest(); text()
-  set_text(&str), set_part(index, &str) -> bool
-Mark::new(text);                              .faint() .style(Style); text(), set_text(&str)
+  set_text(&str), set_part(index, &str) -> bool, set_style(Style), set_part_style(index, Style) -> bool
+Mark::new(text);                              .faint() .style(Style); text(), set_text(&str), set_style(Style)
 Row::new(cells).mark(Mark) | Row::heading(parts) | Row::blank();
   cells(), cells_mut() -> &mut [Cell], leading(), leading_mut() -> Option<&mut Mark>, selectable()
 Column::new(title, min, preferred).priority(u8).pinned().right().flex()
@@ -189,8 +205,9 @@ selection in view; `page()` and `hit` answer for the last draw. Replace the
 rows with `set_rows` when the data changes: the selection stays on its index,
 clamped to the new length, and moves to the nearest row when that index is a
 section. A source changed with `update` or `set_source` does the same. The
-range stays as set either way. To change a few texts of the owned rows,
-rewrite them in place with `row_mut` instead.
+range stays as set either way. To change a few texts or styles of the owned
+rows, rewrite them in place with `row_mut` (or every row with `update`)
+instead.
 
 ## Example
 
@@ -279,12 +296,15 @@ fn visual(list: &mut List, anchor: Option<usize>) {
 fn tick(list: &mut List, index: usize, size: &mut String, bytes: u64) {
     size.clear();
     let _ = write!(size, "{} MB", bytes >> 20);
+    let warm = if bytes >> 20 > 10 { Color::Red } else { Color::Yellow };
     if let Some(row) = list.row_mut(index) {
         if let Some(cell) = row.cells_mut().get_mut(3) {
             cell.set_text(size);
+            cell.set_style(Style::new().fg(warm));
         }
         if let Some(mark) = row.leading_mut() {
             mark.set_text("✓");
+            mark.set_style(Style::new().fg(Color::Green));
         }
     }
 }
@@ -325,7 +345,7 @@ fn main() {
     assert_eq!(list.range(), Some((1, 4)));
     let mut size = String::with_capacity(16);
     tick(&mut list, 1, &mut size, 13 << 20);
-    assert_eq!(list.rows()[1].cells()[3].text(), "13 MB");
+    assert_eq!(list.rows()[1].cells()[3], Cell::new("13 MB").style(Style::new().fg(Color::Red)));
     visual(&mut list, None);
     let names = (0..50_000).map(|n| format!("file-{n}.txt")).collect();
     let mut files = List::from_source(Files { names });

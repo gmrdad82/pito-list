@@ -137,6 +137,24 @@ impl Cell {
         true
     }
 
+    pub fn set_style(&mut self, style: Style) {
+        self.paint = Paint::Own(style);
+    }
+
+    pub fn set_part_style(&mut self, index: usize, style: Style) -> bool {
+        if self.runs.is_empty() {
+            if index == 0 {
+                self.paint = Paint::Own(style);
+            }
+            return index == 0;
+        }
+        let Some(run) = self.runs.get_mut(index) else {
+            return false;
+        };
+        run.paint = Some(Paint::Own(style));
+        true
+    }
+
     pub(crate) fn pieces(&self) -> Pieces<'_> {
         Pieces {
             cell: self,
@@ -217,6 +235,10 @@ impl Mark {
     pub fn set_text(&mut self, text: &str) {
         self.text.clear();
         self.text.push_str(text);
+    }
+
+    pub fn set_style(&mut self, style: Style) {
+        self.paint = Paint::Own(style);
     }
 }
 
