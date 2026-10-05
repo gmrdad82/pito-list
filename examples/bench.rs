@@ -166,4 +166,21 @@ fn main() {
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );
+    let fitted = [
+        Column::new("Name", 10, 0).fit(32).pinned(),
+        Column::new("Version", 8, 0).fit(12).priority(4),
+        Column::new("Owner", 5, 0).fit(12).priority(2),
+        Column::new("State", 5, 0).fit(10).priority(3),
+        Column::new("Message", 8, 0),
+    ];
+    let cursor = themed.cursor(Style::new().fg(Color::Rgb(0xff, 0xcf, 0x5c)));
+    let mut sized = List::new().with_rows((0..ROWS).map(row));
+    let (mean, worst) = run(&mut sized, frames, cursor, &fitted, Some(0), |list, _| {
+        black_box(list.columns());
+    });
+    println!(
+        "pito-list bench: {frames} frames of a {ROWS}-row list with columns that fit their cells, a cursor style and the drawn columns read at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
+        mean.as_secs_f64() * 1e6,
+        worst.as_secs_f64() * 1e6
+    );
 }

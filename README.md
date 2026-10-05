@@ -8,7 +8,7 @@ backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.5.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.6.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -42,6 +42,12 @@ some platforms, so diacritics can still be typed.
 - **The selected row** is drawn whole in the app's selected style (bold accent,
   say), across the full width, behind a "▌ " marker; cell and mark styles give
   way to it. `cursor(..)` replaces the marker text.
+- **A marker in its own style.** `Styles::cursor(style)` draws the marker in
+  that style instead of the selected one, so a list that keeps its cell colours
+  under a bold-only selected style can still colour the marker. It is drawn
+  over the selected line, so what it leaves unset (a background, say) comes
+  from the selected style and the base; remove a modifier with the style's own
+  `remove_modifier`. Unset, the marker takes the selected style as before.
 - **A selected range** for Visual and line-Visual modes:
   `select_range(Some((from, to)))` draws every selectable row from `from` to
   `to` (in either order, both included) in the selected style across the row,
@@ -63,6 +69,24 @@ some platforms, so diacritics can still be typed.
   `pinned()` column drops never, and a column that is left shrinks no
   further than its minimum. Spare width goes to the columns up to their
   preferred widths, left to right.
+- **Columns that fit their cells.** `fit(max)` sizes a column to its widest
+  cell among the rows on screen (and its title, when the header is drawn), up
+  to `max`: at each draw that width stands in for the preferred one, so the
+  column still keeps its minimum, takes spare width left to right with the
+  others and drops by its priority, and a cell wider than it gets is clipped
+  with "…". Only the rows the draw shows are measured, so the width follows the
+  view as the list scrolls. Headings, blank rows and `rest()` cells (and the
+  cells after one) don't count, and a fit on the flexible column changes
+  nothing, since that column takes what's left. With a lazy `Source`, the rows
+  on screen are asked for twice in a draw when a column fits, once to measure
+  and once to draw; no other row is.
+- **Where the columns were drawn.** After a draw, `List::columns()` lists each
+  column drawn as `(column index, x, width)` in terminal cells, left to right:
+  the x the column's cells start at and the width they pad to, clipped to the
+  area. A dropped column, or one the area has no room left for, is absent;
+  before the first draw the list is empty. With `top()`, it places a widget
+  over one cell: row `index` is on line `area.y + header + index - top()`. It
+  is kept in the list, so reading it allocates nothing.
 - **Right-aligned columns.** `right()` pads a column on the left instead of the
   right, for numbers: its cells and its header title end at the column's right
   edge. A text wider than the column is clipped with "…" just as in a
@@ -151,17 +175,18 @@ some platforms, so diacritics can still be typed.
   beyond what a lazy source's own rows do; a 20,000-row list at 150×40 draws
   in about 0.2 ms, and so does a lazy 100,000-row list in groups, and the
   owned list with a range, kept colours, a styled header and rows rewritten
-  every frame (`cargo run --release --example bench`). Only the rows on screen
-  are visited.
+  every frame; with four columns that fit their cells it takes about 0.26 ms
+  (`cargo run --release --example bench`). Only the rows on screen are
+  visited.
 
 ## The API
 
 ```text
 pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
                Left, Right, Up, Down, Home, End, PageUp, PageDown, Delete, Other }   // non_exhaustive
-pub struct Styles { selected, ink, faint, base, header, header_key, keep }   // non_exhaustive
+pub struct Styles { selected, ink, faint, base, header, header_key, cursor, keep }   // non_exhaustive
   Styles::new(); .selected(Style) .ink(Style) .faint(Style) .base(Style)
-                 .header(Style) .header_key(Style) .keep_colours(bool)
+                 .header(Style) .header_key(Style) .cursor(Style) .keep_colours(bool)
 Part::new(text) | From<&str> | From<String>;  .faint() .style(Style); text()
 Cell::new(text) | Cell::parts(parts) | From<&str> | From<String>;
                                               .faint() .style(Style) .rest(); text()
@@ -169,7 +194,7 @@ Cell::new(text) | Cell::parts(parts) | From<&str> | From<String>;
 Mark::new(text);                              .faint() .style(Style); text(), set_text(&str), set_style(Style)
 Row::new(cells).mark(Mark) | Row::heading(parts) | Row::blank();
   cells(), cells_mut() -> &mut [Cell], leading(), leading_mut() -> Option<&mut Mark>, selectable()
-Column::new(title, min, preferred).priority(u8).pinned().right().flex()
+Column::new(title, min, preferred).priority(u8).pinned().right().flex().fit(max: u16)
 pub struct Keys { up, down, page_up, page_down, first, last, open: &'static [Key] }   // non_exhaustive
   Keys::new(), Keys::VIM; .up(..) .down(..) .page_up(..) .page_down(..) .first(..) .last(..) .open(..)
 pub enum Step { Pass, Held, Moved, Open(usize) }                                      // non_exhaustive
@@ -184,6 +209,7 @@ List::new().keys(Keys).paging(Paging).with_rows(rows)          // List<Vec<Row>>
 List::from_source(source).keys(Keys).paging(Paging)             // List<S> for any S: Source
   source(), set_source(source), update(|source| ..)
   len(), is_empty(), selected() -> Option<usize>, select(index), top(), scroll_to(top), page()
+  columns() -> &[(usize, u16, u16)]           // (column index, x, width) of each column drawn
   select_range(Option<(usize, usize)>), range() -> Option<(usize, usize)>
   up(), down(), page_up(), page_down(), first(), last() -> Step
   key(Key) -> Step
@@ -201,7 +227,7 @@ with their constructors and methods, so a later release can add to them in a
 minor version.
 
 Drawing takes `&mut List` because it moves the scroll offset to keep the
-selection in view; `page()` and `hit` answer for the last draw. Replace the
+selection in view; `page()`, `columns()` and `hit` answer for the last draw. Replace the
 rows with `set_rows` when the data changes: the selection stays on its index,
 clamped to the new length, and moves to the nearest row when that index is a
 section. A source changed with `update` or `set_source` does the same. The
@@ -235,7 +261,7 @@ const COLUMNS: [Column; 5] = [
 
 const FILES: [Column; 3] = [
     Column::new("Name", 8, 0).flex(),
-    Column::new("Size", 4, 8).right(),
+    Column::new("Size", 4, 0).right().fit(10),
     Column::new("Lines", 5, 6).right(),
 ];
 
@@ -316,6 +342,7 @@ fn draw(frame: &mut Frame, list: &mut List, files: &mut List<Files>, sort: usize
         .base(Style::new().bg(Color::Black))
         .header(Style::new().fg(Color::Gray).bg(Color::Indexed(236)))
         .header_key(Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .cursor(Style::new().fg(Color::Yellow))
         .keep_colours(true);
     let area = frame.area();
     let half = area.height / 2;
@@ -329,6 +356,10 @@ fn draw(frame: &mut Frame, list: &mut List, files: &mut List<Files>, sort: usize
         .empty(Some("Nothing yet."));
     frame.render_widget(view, above);
     frame.render_widget(ListView::new(files, &FILES).styles(styles).header(true), below);
+    if let (Some(at), Some(&(_, x, width))) = (files.selected(), files.columns().get(1)) {
+        let line = below.y + 1 + u16::try_from(at.saturating_sub(files.top())).unwrap_or(0);
+        frame.buffer_mut().set_style(Rect::new(x, line, width, 1), Style::new().fg(Color::Cyan));
+    }
 }
 
 fn click(list: &List, area: Rect, column: u16, row: u16) -> Option<usize> {

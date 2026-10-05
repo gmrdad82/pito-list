@@ -106,6 +106,7 @@ fn drawing_allocates_nothing() {
                         .render(area, buffer);
                 }
                 std::hint::black_box(list.hit(area, true, 3, 3));
+                std::hint::black_box(list.columns());
             }
             let key = [
                 Key::Down,
@@ -205,6 +206,13 @@ const GROUPED: [Column<'static>; 3] = [
     Column::new("Name", 8, 0).flex(),
     Column::new("Size", 4, 8).right().priority(1),
     Column::new("Count", 3, 5).right(),
+];
+
+const FITTED: [Column<'static>; 4] = [
+    Column::new("Name", 4, 0).fit(30).pinned(),
+    Column::new("Size", 4, 0).fit(10).right().priority(1),
+    Column::new("Count", 3, 5).right().fit(6),
+    Column::new("Note", 4, 0),
 ];
 
 const KEYS: [Key; 8] = [
@@ -308,6 +316,39 @@ fn a_lazy_list_allocates_only_what_its_rows_do() {
     assert!(list.source().built.get() < 60 * 100);
 }
 
+#[test]
+fn a_lazy_list_with_fitted_columns_allocates_only_what_its_rows_do() {
+    let mut list = List::from_source(Lazy {
+        len: 50_000,
+        built: Counter::new(0),
+        own: Counter::new(0),
+    })
+    .keys(Keys::VIM);
+    let mut buffers = sizes();
+    let styles = Styles::new()
+        .selected(Style::new().add_modifier(Modifier::BOLD))
+        .cursor(ACCENT)
+        .keep_colours(true);
+    let counted = allocations(|| {
+        for round in 0..60usize {
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                ListView::new(&mut list, &FITTED)
+                    .styles(styles)
+                    .header(round % 2 == 0)
+                    .end(Some("· end ·"))
+                    .render(area, buffer);
+                std::hint::black_box(list.columns());
+            }
+            std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
+        }
+    });
+    let own = list.source().own.get();
+    assert!(own > 0);
+    assert_eq!(counted, own);
+    assert!(list.source().built.get() < 60 * 200);
+}
+
 const MARKS: [&str; 6] = ["⧗", "✓", "10", "9", "100", ""];
 const HEAT: [Color; 5] = [
     Color::Green,
@@ -324,6 +365,7 @@ fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String
         .base(Style::new().bg(Color::Black))
         .header(Style::new().fg(Color::Yellow).bg(Color::DarkGray))
         .header_key(ACCENT)
+        .cursor(Style::new().fg(Color::Yellow))
         .keep_colours(true);
     for step in 0..3 {
         let index = (round * 7 + step * 211) % list.len();
@@ -361,20 +403,28 @@ fn rewrite_and_draw(list: &mut List, buffers: &mut [Buffer], number: &mut String
     });
     let at = list.selected().unwrap_or(0);
     list.select_range((!round.is_multiple_of(4)).then_some((at.saturating_sub(round % 9), at)));
+    let columns: &[Column] = if round.is_multiple_of(2) {
+        &GROUPED
+    } else {
+        &FITTED
+    };
     for buffer in buffers.iter_mut() {
         let area = buffer.area;
-        ListView::new(list, &GROUPED)
+        ListView::new(list, columns)
             .styles(styles)
-            .header(true)
+            .header(!round.is_multiple_of(3))
             .key_column(Some(round % 4))
             .end(Some("· end ·"))
             .render(area, buffer);
+        for &(at, x, width) in list.columns() {
+            std::hint::black_box((at, x.saturating_add(width)));
+        }
     }
     std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
 }
 
 #[test]
-fn a_frame_that_rewrites_and_restyles_cells_and_marks_and_draws_a_range_and_header_styles_allocates_nothing()
+fn a_frame_that_rewrites_and_restyles_cells_and_marks_and_draws_a_range_header_styles_a_cursor_style_and_fitted_columns_allocates_nothing()
  {
     let mut list = List::new().keys(Keys::VIM).with_rows((0..600).map(grouped));
     let mut buffers = sizes();

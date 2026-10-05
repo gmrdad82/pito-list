@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ratatui::layout::Rect;
 
-use crate::{Key, Row, row::Kind};
+use crate::{Key, MAX_COLUMNS, Row, row::Kind};
 
 const PAGE: usize = 10;
 
@@ -148,6 +148,8 @@ pub struct List<S = Vec<Row>> {
     range: Option<(usize, usize)>,
     keys: Keys,
     paging: Paging,
+    placed: [(usize, u16, u16); MAX_COLUMNS],
+    placed_len: usize,
 }
 
 impl Default for List {
@@ -221,6 +223,8 @@ impl<S: Source> List<S> {
             range: None,
             keys: Keys::new(),
             paging: Paging::Cursor,
+            placed: [(0, 0, 0); MAX_COLUMNS],
+            placed_len: 0,
         }
     }
 
@@ -302,6 +306,18 @@ impl<S: Source> List<S> {
 
     pub fn page(&self) -> usize {
         self.page
+    }
+
+    pub fn columns(&self) -> &[(usize, u16, u16)] {
+        &self.placed[..self.placed_len]
+    }
+
+    pub(crate) fn place(&mut self, placed: impl IntoIterator<Item = (usize, u16, u16)>) {
+        self.placed_len = 0;
+        for (slot, column) in self.placed.iter_mut().zip(placed) {
+            *slot = column;
+            self.placed_len += 1;
+        }
     }
 
     pub(crate) fn mark_width(&mut self) -> u16 {

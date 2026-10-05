@@ -8,6 +8,7 @@ pub struct Column<'a> {
     pub(crate) pinned: bool,
     pub(crate) right: bool,
     pub(crate) flex: bool,
+    pub(crate) fit: Option<u16>,
 }
 
 impl<'a> Column<'a> {
@@ -20,6 +21,7 @@ impl<'a> Column<'a> {
             pinned: false,
             right: false,
             flex: false,
+            fit: None,
         }
     }
 
@@ -40,6 +42,11 @@ impl<'a> Column<'a> {
 
     pub const fn flex(mut self) -> Self {
         self.flex = true;
+        self
+    }
+
+    pub const fn fit(mut self, max: u16) -> Self {
+        self.fit = Some(max);
         self
     }
 }

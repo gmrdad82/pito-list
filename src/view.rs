@@ -21,6 +21,7 @@ pub struct Styles {
     pub(crate) base: Style,
     pub(crate) header: Option<Style>,
     pub(crate) header_key: Option<Style>,
+    pub(crate) cursor: Option<Style>,
     pub(crate) keep: bool,
 }
 
@@ -33,6 +34,7 @@ impl Styles {
             base: Style::new(),
             header: None,
             header_key: None,
+            cursor: None,
             keep: false,
         }
     }
@@ -67,6 +69,11 @@ impl Styles {
         self
     }
 
+    pub const fn cursor(mut self, style: Style) -> Self {
+        self.cursor = Some(style);
+        self
+    }
+
     pub const fn keep_colours(mut self, keep: bool) -> Self {
         self.keep = keep;
         self
@@ -92,6 +99,7 @@ struct Layout {
     kept: [bool; MAX_COLUMNS],
     right: [bool; MAX_COLUMNS],
     count: usize,
+    flex: usize,
 }
 
 fn small(value: usize) -> u16 {
@@ -106,6 +114,7 @@ impl Layout {
             kept: [false; MAX_COLUMNS],
             right: [false; MAX_COLUMNS],
             count,
+            flex: 0,
         };
         for (right, column) in layout.right.iter_mut().zip(columns) {
             *right = column.right;
@@ -113,29 +122,15 @@ impl Layout {
         if count == 0 {
             return layout;
         }
-        let flex = columns[..count]
+        layout.flex = columns[..count]
             .iter()
             .position(|column| column.flex)
             .unwrap_or(count - 1);
-        let width = usize::from(width);
-        let lead = usize::from(lead);
-        let gap = usize::from(gap);
         layout.kept[..count].fill(true);
-        let need = |kept: &[bool; MAX_COLUMNS]| {
-            let mut total = lead.saturating_add(usize::from(columns[flex].min));
-            for at in 0..count {
-                if at != flex && kept[at] {
-                    total = total
-                        .saturating_add(usize::from(columns[at].min))
-                        .saturating_add(gap);
-                }
-            }
-            total
-        };
-        while need(&layout.kept) > width {
+        while layout.need(columns, lead, gap) > usize::from(width) {
             let mut pick: Option<usize> = None;
             for at in 0..count {
-                if at != flex && layout.kept[at] && !columns[at].pinned {
+                if at != layout.flex && layout.kept[at] && !columns[at].pinned {
                     match pick {
                         Some(held) if columns[held].rank > columns[at].rank => {}
                         _ => pick = Some(at),
@@ -147,22 +142,104 @@ impl Layout {
                 None => break,
             }
         }
-        let mut extra = width.saturating_sub(need(&layout.kept));
-        let mut used = lead;
-        for (at, column) in columns.iter().enumerate().take(count) {
-            if at == flex || !layout.kept[at] {
+        layout
+    }
+
+    fn need(&self, columns: &[Column], lead: u16, gap: u16) -> usize {
+        let mut total = usize::from(lead).saturating_add(usize::from(columns[self.flex].min));
+        for (at, column) in columns.iter().enumerate().take(self.count) {
+            if at != self.flex && self.kept[at] {
+                total = total
+                    .saturating_add(usize::from(column.min))
+                    .saturating_add(usize::from(gap));
+            }
+        }
+        total
+    }
+
+    fn fits(&self, columns: &[Column], at: usize) -> bool {
+        at != self.flex && self.kept[at] && columns[at].fit.is_some()
+    }
+
+    fn size(&mut self, columns: &[Column], width: u16, lead: u16, gap: u16, fitted: &[u16]) {
+        if self.count == 0 {
+            return;
+        }
+        let width = usize::from(width);
+        let mut extra = width.saturating_sub(self.need(columns, lead, gap));
+        let mut used = usize::from(lead);
+        for (at, column) in columns.iter().enumerate().take(self.count) {
+            if at == self.flex || !self.kept[at] {
                 continue;
             }
             let min = usize::from(column.min);
-            let grow = usize::from(column.preferred).saturating_sub(min).min(extra);
+            let preferred = match column.fit {
+                Some(cap) => fitted[at].min(cap),
+                None => column.preferred,
+            };
+            let grow = usize::from(preferred).saturating_sub(min).min(extra);
             extra -= grow;
             let size = min + grow;
-            layout.widths[at] = small(size);
-            used = used.saturating_add(size).saturating_add(gap);
+            self.widths[at] = small(size);
+            used = used.saturating_add(size).saturating_add(usize::from(gap));
         }
-        layout.widths[flex] = small(width.saturating_sub(used));
-        layout
+        self.widths[self.flex] = small(width.saturating_sub(used));
     }
+
+    fn places(&self, from: u16, edge: u16, gap: u16) -> impl Iterator<Item = (usize, u16, u16)> {
+        (0..self.count)
+            .filter(|&at| self.kept[at])
+            .scan(from, move |x, at| {
+                let start = *x;
+                *x = start.saturating_add(self.widths[at]).saturating_add(gap);
+                Some((at, start, self.widths[at].min(edge.saturating_sub(start))))
+            })
+            .filter(|&(_, _, width)| width > 0)
+    }
+}
+
+fn fitted<S: Source>(
+    list: &List<S>,
+    columns: &[Column],
+    layout: &Layout,
+    header: bool,
+    lines: usize,
+) -> [u16; MAX_COLUMNS] {
+    let mut widths = [0; MAX_COLUMNS];
+    let count = layout.count;
+    if !(0..count).any(|at| layout.fits(columns, at)) {
+        return widths;
+    }
+    if header {
+        for (at, width) in widths.iter_mut().enumerate().take(count) {
+            if layout.fits(columns, at) {
+                *width = text::cells(columns[at].title);
+            }
+        }
+    }
+    let from = list.top();
+    let to = from.saturating_add(lines).min(list.len());
+    for index in from..to {
+        let row = list.row(index);
+        if row.kind != Kind::Item {
+            continue;
+        }
+        for (at, cell) in row.cells.iter().enumerate().take(count) {
+            if !layout.kept[at] {
+                continue;
+            }
+            if cell.rest {
+                break;
+            }
+            if layout.fits(columns, at) {
+                let cells = cell.pieces().fold(0usize, |total, (text, _)| {
+                    total.saturating_add(text::width(text))
+                });
+                widths[at] = widths[at].max(small(cells));
+            }
+        }
+    }
+    widths
 }
 
 fn columns_line<'r, I>(
@@ -302,7 +379,8 @@ impl Line<'_> {
             blank(buf, x, y, room, self.chosen);
         }
         if lit == Lit::Cursor {
-            put(buf, x, y, self.indent, self.cursor, self.styles.selected);
+            let style = self.styles.cursor.unwrap_or(self.styles.selected);
+            put(buf, x, y, self.indent, self.cursor, style);
         }
         x = x.saturating_add(self.indent);
         if let Some(mark) = &row.mark {
@@ -370,6 +448,7 @@ impl<S: Source> Widget for ListView<'_, S> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let area = area.intersection(buf.area);
         if area.is_empty() {
+            self.list.place(iter::empty());
             return;
         }
         let ListView {
@@ -391,10 +470,17 @@ impl<S: Source> Widget for ListView<'_, S> {
         let lead = indent
             .saturating_add(mark_width)
             .saturating_add(u16::from(mark_width > 0));
+        let y = area.y.saturating_add(u16::from(header));
+        let height = usize::from(area.bottom().saturating_sub(y));
+        let selected = list.follow(height, end.is_some());
+        let mut layout = Layout::new(columns, area.width, lead, gap);
+        let fitted = fitted(list, columns, &layout, header, height);
+        layout.size(columns, area.width, lead, gap, &fitted);
+        list.place(layout.places(area.x.saturating_add(lead), area.right(), gap));
         let line = Line {
             styles,
             chosen: styles.base.patch(styles.selected),
-            layout: Layout::new(columns, area.width, lead, gap),
+            layout,
             gap,
             indent,
             lead,
@@ -402,13 +488,9 @@ impl<S: Source> Widget for ListView<'_, S> {
             mark_width,
             area,
         };
-        let mut y = area.y;
         if header {
-            line.header(buf, y, columns, key);
-            y += 1;
+            line.header(buf, area.y, columns, key);
         }
-        let height = usize::from(area.bottom().saturating_sub(y));
-        let selected = list.follow(height, end.is_some());
         if list.is_empty() {
             if let Some(text) = empty
                 && height > 0
