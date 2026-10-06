@@ -244,9 +244,9 @@ fn fitted<S: Source>(
 
 fn columns_line<'r, I>(
     buf: &mut Buffer,
+    clip: Rect,
     y: u16,
     from: u16,
-    edge: u16,
     layout: &Layout,
     gap: u16,
     mut cell: impl FnMut(usize) -> Option<(I, bool)>,
@@ -261,10 +261,11 @@ fn columns_line<'r, I>(
         let size = layout.widths[at];
         if let Some((runs, rest)) = cell(at) {
             if rest {
-                put_runs(buf, x, y, edge.saturating_sub(x), runs, layout.right[at]);
+                let room = clip.right().saturating_sub(x);
+                put_runs(buf, clip, x, y, room, runs, layout.right[at]);
                 return;
             }
-            put_runs(buf, x, y, size, runs, layout.right[at]);
+            put_runs(buf, clip, x, y, size, runs, layout.right[at]);
         }
         x = x.saturating_add(size).saturating_add(gap);
     }
@@ -376,16 +377,17 @@ impl Line<'_> {
         let room = area.width;
         let chosen = lit != Lit::No;
         if chosen {
-            blank(buf, x, y, room, self.chosen);
+            blank(buf, area, x, y, room, self.chosen);
         }
         if lit == Lit::Cursor {
             let style = self.styles.cursor.unwrap_or(self.styles.selected);
-            put(buf, x, y, self.indent, self.cursor, style);
+            put(buf, area, x, y, self.indent, self.cursor, style);
         }
         x = x.saturating_add(self.indent);
         if let Some(mark) = &row.mark {
             put(
                 buf,
+                area,
                 x,
                 y,
                 self.mark_width,
@@ -394,7 +396,7 @@ impl Line<'_> {
             );
         }
         x = x.saturating_add(self.lead - self.indent);
-        columns_line(buf, y, x, area.right(), &self.layout, self.gap, |at| {
+        columns_line(buf, area, y, x, &self.layout, self.gap, |at| {
             let cell = row.cells.get(at)?;
             let runs = cell
                 .pieces()
@@ -412,7 +414,7 @@ impl Line<'_> {
         let runs = cell
             .pieces()
             .map(|(text, paint)| (text, self.styles.resolve(paint)));
-        put_runs(buf, x, y, room, runs, false);
+        put_runs(buf, self.area, x, y, room, runs, false);
     }
 
     fn header(&self, buf: &mut Buffer, y: u16, columns: &[Column], key: Option<usize>) {
@@ -420,6 +422,7 @@ impl Line<'_> {
         if let Some(style) = styles.header {
             blank(
                 buf,
+                self.area,
                 self.area.x,
                 y,
                 self.area.width,
@@ -428,7 +431,7 @@ impl Line<'_> {
         }
         let title = styles.header.unwrap_or(styles.faint);
         let x = self.area.x.saturating_add(self.lead);
-        columns_line(buf, y, x, self.area.right(), &self.layout, self.gap, |at| {
+        columns_line(buf, self.area, y, x, &self.layout, self.gap, |at| {
             let style = match styles.header_key {
                 Some(style) if key == Some(at) => style,
                 _ => title,
@@ -440,7 +443,7 @@ impl Line<'_> {
     fn note(&self, buf: &mut Buffer, y: u16, text: &str) {
         let x = self.area.x.saturating_add(self.indent);
         let room = self.area.width.saturating_sub(self.indent);
-        put(buf, x, y, room, text, self.styles.faint);
+        put(buf, self.area, x, y, room, text, self.styles.faint);
     }
 }
 
@@ -463,7 +466,7 @@ impl<S: Source> Widget for ListView<'_, S> {
             empty,
         } = self;
         for y in area.top()..area.bottom() {
-            blank(buf, area.x, y, area.width, styles.base);
+            blank(buf, area, area.x, y, area.width, styles.base);
         }
         let indent = text::cells(cursor);
         let mark_width = list.mark_width();

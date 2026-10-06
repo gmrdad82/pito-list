@@ -8,7 +8,7 @@ backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.6.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.6.1" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -91,6 +91,13 @@ some platforms, so diacritics can still be typed.
   right, for numbers: its cells and its header title end at the column's right
   edge. A text wider than the column is clipped with "…" just as in a
   left-aligned one.
+- **Drawn inside its area only.** Every cell the list writes (the rows, the
+  header, the marker, the marks, the end and empty lines) is clipped to the
+  area it is drawn in, not to the buffer, so a list beside a detail pane never
+  draws over it. When the pinned columns' minimums don't fit the area, a row is
+  cut at the area's right edge with "…", and a right-aligned column at that
+  edge ends its cells there, just as at the buffer's edge: a list draws the same
+  in part of a buffer as in a buffer of its own.
 - **The flexible column takes what's left** (a message, say), is never
   dropped and is clipped with "…". Its minimum is always kept free, and its
   preferred width isn't used. It is the last column unless one is marked
