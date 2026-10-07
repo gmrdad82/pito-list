@@ -1,9 +1,9 @@
 [package]
 name = "pito-list"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Gamer Dad"]
 edition = "2024"
-description = "Selectable list rows for ratatui apps: a bold marker on the selected row in its own style, a selected range, padded columns that drop by priority or fit their cells, a flexible clipped column, section headings, a styled header, lazy rows, rows rewritten and restyled in place, the drawn column positions, scrolling, paging and click hits"
+description = "Selectable list rows for ratatui apps: a bold marker on the selected row in its own style, a selected range, padded columns that drop by priority or fit their cells, a flexible clipped column, section headings, a styled header, lazy rows, shared vectors built on demand, rows rewritten and restyled in place, the drawn column positions, scrolling, paging and click hits"
 license = "MIT"
 repository = "https://github.com/gmrdad82/pito-list"
 homepage = "https://pitomd.com"

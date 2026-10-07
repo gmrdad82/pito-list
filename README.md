@@ -17,7 +17,7 @@ comes from the app, so any language works.
 It isn't on crates.io; add it from git, pinned to a release tag:
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.6.1" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.7.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -142,6 +142,27 @@ as it scrolls, `v` for a range, `g` and `G` for the ends, enter to open and
   list can't look at every row's mark. `update(..)` changes the source in
   place and `set_source(..)` replaces it; both clamp the selection. The owned
   rows of `List::new()` are themselves a source (`Vec<Row>`).
+- **Shared vectors, rows built on demand.** `Shared::new(items, builder)` is a
+  ready source over an `Arc<Vec<T>>` of the app's own items (jobs, pings, log
+  lines): the builder turns one item into a `Row` only when a draw or a key
+  asks for it, so a list of tens of thousands of items builds only the rows on
+  screen, with pinned and priority columns, sections, the end line and the
+  empty text like any other list. The builder is a closure
+  `|index, item: &T| -> Row`, or a type of the app's that implements
+  `Build<T>`, which names the list's type in a struct field
+  (`List<Shared<Job, Cells>>`, or `List<Shared<Job>>` with a plain `fn`),
+  holds what the rows are built with (the columns that fit this width, a
+  clock) and may answer `selectable` without building the row.
+  `set_items(..)` hands over a new vector for the cost of an `Arc` clone and
+  `builder_mut()` changes the builder's state; through `update(..)`, either
+  keeps the selection on its index, clamped. Name the mark column's width with
+  `marks(width)` or `set_marks(width)` (none by default), since no row is built
+  to find it.
+- **Shared rows.** Rows the app has already built can be shared as they are:
+  `Arc<Vec<Row>>` and `Arc<[Row]>` are sources too. They lend their rows like
+  the owned `Vec<Row>` and, like it, scan the rows' marks once when handed over,
+  so handing the list a clone of the `Arc` every frame copies no row and
+  allocates nothing.
 - **An optional header line** of the column titles, an optional end line (the
   app's words, say "· end ·") after the last row, and an optional line for an
   empty list, all in the faint style.
@@ -200,7 +221,8 @@ as it scrolls, `v` for a range, `g` and `G` for the ends, enter to open and
   space, other control characters are dropped, and every sum saturates.
 - **Cheap.** Drawing writes straight into the buffer and allocates nothing
   beyond what a lazy source's own rows do; a 20,000-row list at 150×40 draws
-  in about 0.2 ms, and so does a lazy 100,000-row list in groups, and the
+  in about 0.2 ms, and so does a lazy 100,000-row list in groups, a shared
+  100,000-item vector built on demand and handed over every frame, and the
   owned list with a range, kept colours, a styled header and rows rewritten
   every frame; with four columns that fit their cells it takes about 0.26 ms
   (`cargo run --release --example bench`). Only the rows on screen are
@@ -229,7 +251,14 @@ pub enum Paging { Cursor, View }                                                
 pub trait Source {
   fn len(&self) -> usize;  fn row(&self, index: usize) -> Cow<'_, Row>;
   fn is_empty(&self) -> bool;  fn selectable(&self, index: usize) -> bool;  fn mark_width(&self) -> u16;
-}                                              // the last three have defaults; Vec<Row> implements it
+}                                              // the last three have defaults; Vec<Row>,
+                                               // Arc<Vec<Row>>, Arc<[Row]> and Shared implement it
+pub trait Build<T> {
+  fn row(&self, index: usize, item: &T) -> Row;  fn selectable(&self, index: usize, item: &T) -> bool;
+}                                              // selectable has a default; every Fn(usize, &T) -> Row is one
+pub struct Shared<T, B = fn(usize, &T) -> Row> // a Source over Arc<Vec<T>>, rows built by B when asked
+Shared::new(Arc<Vec<T>>, builder).marks(u16)
+  items(), set_items(Arc<Vec<T>>), builder(), builder_mut(), set_marks(u16)
 pub struct List<S = Vec<Row>>
 List::new().keys(Keys).paging(Paging).with_rows(rows)          // List<Vec<Row>>
   set_rows(rows), push(row), clear(), rows(), selected_row(), row_mut(index) -> Option<&mut Row>
@@ -265,10 +294,11 @@ instead.
 ## Example
 
 ```rust,standalone_crate
-use std::{borrow::Cow, fmt::Write};
+use std::{borrow::Cow, fmt::Write, sync::Arc};
 
 use pito_list::{
-    Cell, Column, Key, List, ListView, Mark, Paging, Part, Row, Source, Step, Styles,
+    Build, Cell, Column, Key, List, ListView, Mark, Paging, Part, Row, Shared, Source, Step,
+    Styles,
 };
 use ratatui::{
     Frame,
@@ -333,6 +363,40 @@ impl Source for Files {
             format!("{}", index * 3),
         ]))
     }
+}
+
+const JOBS: [Column; 2] = [
+    Column::new("Job", 8, 24).pinned(),
+    Column::new("Size", 4, 0).right(),
+];
+
+struct Job {
+    name: String,
+    bytes: u64,
+}
+
+struct Cells {
+    unit: &'static str,
+    shift: u32,
+}
+
+impl Build<Job> for Cells {
+    fn row(&self, _: usize, job: &Job) -> Row {
+        Row::new([job.name.clone(), format!("{} {}", job.bytes >> self.shift, self.unit)])
+    }
+
+    fn selectable(&self, _: usize, _: &Job) -> bool {
+        true
+    }
+}
+
+fn jobs(frame: &mut Frame, list: &mut List<Shared<Job, Cells>>, jobs: &Arc<Vec<Job>>, area: Rect) {
+    list.update(|shared| shared.set_items(Arc::clone(jobs)));
+    let view = ListView::new(list, &JOBS)
+        .header(true)
+        .end(Some("· end ·"))
+        .empty(Some("No jobs yet."));
+    frame.render_widget(view, area);
 }
 
 fn key(list: &mut List, key: Key) -> Option<usize> {
@@ -410,6 +474,16 @@ fn main() {
     files.update(|files| files.names.push("new.txt".to_string()));
     files.scroll_to(100);
     assert_eq!(files.len(), 50_001);
+    let all: Arc<Vec<Job>> = Arc::new(
+        (0..30_000)
+            .map(|n| Job { name: format!("job {n}"), bytes: n << 20 })
+            .collect(),
+    );
+    let mut table = List::from_source(Shared::new(Arc::clone(&all), Cells { unit: "kB", shift: 10 }));
+    table.update(|shared| *shared.builder_mut() = Cells { unit: "MB", shift: 20 });
+    table.select(29_999);
+    assert_eq!(table.selected(), Some(29_999));
+    assert_eq!(table.source().row(7).cells()[1], Cell::new("7 MB"));
 }
 ```
 

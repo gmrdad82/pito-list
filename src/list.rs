@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use ratatui::layout::Rect;
 
@@ -110,23 +110,29 @@ pub trait Source {
     }
 }
 
-impl Source for Vec<Row> {
-    fn len(&self) -> usize {
-        <[Row]>::len(self)
-    }
+macro_rules! rows {
+    ($($source:ty),*) => {$(
+        impl Source for $source {
+            fn len(&self) -> usize {
+                <[Row]>::len(self)
+            }
 
-    fn row(&self, index: usize) -> Cow<'_, Row> {
-        Cow::Borrowed(&self[index])
-    }
+            fn row(&self, index: usize) -> Cow<'_, Row> {
+                Cow::Borrowed(&self[index])
+            }
 
-    fn selectable(&self, index: usize) -> bool {
-        self[index].selectable()
-    }
+            fn selectable(&self, index: usize) -> bool {
+                self[index].selectable()
+            }
 
-    fn mark_width(&self) -> u16 {
-        self.iter().map(Row::mark_width).max().unwrap_or(0)
-    }
+            fn mark_width(&self) -> u16 {
+                self.iter().map(Row::mark_width).max().unwrap_or(0)
+            }
+        }
+    )*};
 }
+
+rows!(Vec<Row>, Arc<Vec<Row>>, Arc<[Row]>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]

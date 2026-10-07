@@ -3,6 +3,7 @@ use std::{
     borrow::Cow,
     cell::Cell as Counter,
     fmt::Write,
+    sync::Arc,
 };
 
 use pito_list::{
@@ -347,6 +348,34 @@ fn a_lazy_list_with_fitted_columns_allocates_only_what_its_rows_do() {
     assert!(own > 0);
     assert_eq!(counted, own);
     assert!(list.source().built.get() < 60 * 200);
+}
+
+#[test]
+fn a_shared_row_vector_handed_over_every_frame_allocates_nothing() {
+    let rows: Arc<Vec<Row>> = Arc::new((0..5_000).map(grouped).collect());
+    let mut list = List::from_source(Arc::clone(&rows)).keys(Keys::VIM);
+    let mut buffers = sizes();
+    for buffer in &mut buffers {
+        let area = buffer.area;
+        ListView::new(&mut list, &FITTED)
+            .header(true)
+            .render(area, buffer);
+    }
+    let counted = allocations(|| {
+        for round in 0..60usize {
+            list.set_source(Arc::clone(&rows));
+            for buffer in &mut buffers {
+                let area = buffer.area;
+                ListView::new(&mut list, &FITTED)
+                    .header(round % 2 == 0)
+                    .end(Some("· end ·"))
+                    .empty(Some("Nothing yet."))
+                    .render(area, buffer);
+            }
+            std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
+        }
+    });
+    assert_eq!(counted, 0);
 }
 
 const MARKS: [&str; 6] = ["⧗", "✓", "10", "9", "100", ""];

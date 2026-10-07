@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::hint::black_box;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use pito_list::{Cell, Column, Key, List, ListView, Mark, Part, Row, Source, Styles};
+use pito_list::{Cell, Column, Key, List, ListView, Mark, Part, Row, Shared, Source, Styles};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -180,6 +181,17 @@ fn main() {
     });
     println!(
         "pito-list bench: {frames} frames of a {ROWS}-row list with columns that fit their cells, a cursor style and the drawn columns read at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
+        mean.as_secs_f64() * 1e6,
+        worst.as_secs_f64() * 1e6
+    );
+    let items: Arc<Vec<usize>> = Arc::new((0..LAZY).collect());
+    let mut shared =
+        List::from_source(Shared::new(Arc::clone(&items), |_, &n: &usize| row(n)).marks(1));
+    let (mean, worst) = run(&mut shared, frames, styles, &columns, None, |list, _| {
+        list.update(|shared| shared.set_items(Arc::clone(&items)));
+    });
+    println!(
+        "pito-list bench: {frames} frames of a shared {LAZY}-item vector built on demand and handed over every frame at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );
