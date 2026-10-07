@@ -1,5 +1,7 @@
 # pito-list
 
+[![CI](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml)
+
 ![The demo example: jobs in sections, sizes that grow in place, a selected range and the view following the selection to the end](docs/demo.gif)
 
 The list behind the [PITO](https://pitomd.com) terminal apps, as a crate.
@@ -9,6 +11,10 @@ style, the other rows as two blank cells plus their cells in their own styles,
 and the columns pad to align across rows. It's a ratatui 0.30 widget with no
 backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
+
+## Install
+
+It isn't on crates.io; add it from git, pinned to a release tag:
 
 ```toml
 pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.6.1" }
@@ -413,12 +419,20 @@ fn main() {
 --all-features -- -D warnings`, every test with `cargo nextest` (the tests
 draw into ratatui buffers, and a counting allocator holds that a warm frame
 allocates nothing), this README's example as a doctest, and the release build
-of the bench example. `bin/gate --fast` leaves the bench build out. Issues and
-pull requests are welcome; a change comes with `bin/gate` passing.
+of the bench example. `bin/gate --fast` leaves the bench build out, and CI
+runs it on every push and pull request to main.
+
+## Contributing
+
+Issues and pull requests are welcome. Please read the
+[code of conduct](CODE_OF_CONDUCT.md) first. A change keeps `bin/gate` green
+with no warnings, keeps a warm frame free of allocations, and leaves every
+word, style and key to the app. Report a security issue privately, as
+[SECURITY.md](SECURITY.md) says, not in a public issue.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE); the code is Catalin Ilinca's. The MIT grant
-covers the code only: the PITO name and its logos stay his, all rights
-reserved. The look is in the style of HEY's terminal UI; see
-[NOTICE.md](NOTICE.md).
+The code is MIT licensed, © Catalin Ilinca: see [LICENSE](LICENSE). The MIT
+grant covers the code only: the PITO name and its logos are © Catalin Ilinca,
+all rights reserved, and are not covered by it. The look is in the style of
+HEY's terminal UI; see [NOTICE.md](NOTICE.md).
