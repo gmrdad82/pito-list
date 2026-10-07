@@ -3,6 +3,7 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use pito_footer::{Guard, QuitGuard, Wording};
 use pito_list::{Cell, Column, Key, Keys, List, ListView, Mark, Part, Row, Step, Styles};
 use ratatui::{
     DefaultTerminal, Frame,
@@ -13,7 +14,8 @@ use ratatui::{
 const BOLD: Style = Style::new().add_modifier(Modifier::BOLD);
 const FAINT: Style = Style::new().add_modifier(Modifier::DIM);
 const TICK: Duration = Duration::from_millis(120);
-const HINTS: &str = "↑↓ j k move · g G ends · v range · enter open · q quit";
+const NOTE: Style = Style::new().fg(Color::Cyan);
+const HINTS: &str = "↑↓ j k move · v range · enter open · ctrl+c twice quit";
 
 const COLUMNS: [Column; 5] = [
     Column::new("Job", 10, 16).pinned(),
@@ -36,6 +38,7 @@ struct App {
     jobs: [Job; 2],
     anchor: Option<usize>,
     opened: Option<usize>,
+    guard: QuitGuard,
     text: String,
 }
 
@@ -141,6 +144,7 @@ impl App {
             ],
             anchor: None,
             opened: None,
+            guard: QuitGuard::new(Wording::new("Press ctrl+c again to quit")),
             text: String::with_capacity(32),
         };
         app.tick();
@@ -148,6 +152,7 @@ impl App {
     }
 
     fn tick(&mut self) {
+        self.guard.tick(Instant::now());
         for job in &mut self.jobs {
             job.done = (job.done + job.rate) % job.total;
             let share = job.done * 100 / job.total;
@@ -170,7 +175,15 @@ impl App {
         }
     }
 
-    fn key(&mut self, press: KeyEvent) {
+    fn key(&mut self, press: KeyEvent) -> bool {
+        match self
+            .guard
+            .key(pito_footer::Key::from(press), Instant::now(), false)
+        {
+            Guard::Quit => return true,
+            Guard::Held => return false,
+            _ => {}
+        }
         match press.code {
             KeyCode::Char('v') => {
                 self.anchor = match self.anchor {
@@ -190,6 +203,7 @@ impl App {
         }
         self.list
             .select_range(self.anchor.zip(self.list.selected()));
+        false
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -207,21 +221,20 @@ impl App {
         if area.height < 2 {
             return;
         }
-        let note = match (self.list.range(), self.opened) {
-            (Some((from, to)), _) => format!("range {} … {}", self.name(from), self.name(to)),
-            (None, Some(index)) => format!("opened {}", self.name(index)),
-            (None, None) => String::new(),
+        let (note, style) = match (self.guard.notice(), self.list.range(), self.opened) {
+            (Some(again), _, _) => (again.to_owned(), NOTE.add_modifier(Modifier::BOLD)),
+            (None, Some((from, to)), _) => (
+                format!("range {} … {}", self.name(from), self.name(to)),
+                NOTE,
+            ),
+            (None, None, Some(index)) => (format!("opened {}", self.name(index)), NOTE),
+            (None, None, None) => (String::new(), NOTE),
         };
         let line = area.bottom() - 1;
         let width = u16::try_from(note.chars().count()).unwrap_or(0);
         let buffer = frame.buffer_mut();
         buffer.set_string(area.x + 2, line, HINTS, FAINT);
-        buffer.set_string(
-            area.right().saturating_sub(width + 2),
-            line,
-            &note,
-            Style::new().fg(Color::Cyan),
-        );
+        buffer.set_string(area.right().saturating_sub(width + 2), line, &note, style);
     }
 
     fn name(&self, index: usize) -> &str {
@@ -241,11 +254,9 @@ fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
         if event::poll(TICK.saturating_sub(last.elapsed()))?
             && let Event::Key(press) = event::read()?
             && press.kind == KeyEventKind::Press
+            && app.key(press)
         {
-            if press.code == KeyCode::Char('q') {
-                return Ok(());
-            }
-            app.key(press);
+            return Ok(());
         }
         if last.elapsed() >= TICK {
             app.tick();

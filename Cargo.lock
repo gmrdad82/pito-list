@@ -431,10 +431,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pito-footer"
+version = "0.4.0"
+source = "git+https://github.com/gmrdad82/pito-footer?tag=v0.4.0#2c24fcadff7b9a41d08db5a5111826fc013b28a7"
+dependencies = [
+ "crossterm",
+ "ratatui",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "pito-list"
 version = "0.7.0"
 dependencies = [
  "crossterm",
+ "pito-footer",
  "ratatui",
  "unicode-segmentation",
  "unicode-width",

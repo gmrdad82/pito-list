@@ -22,6 +22,7 @@ unicode-segmentation = "1"
 unicode-width = "0.2"
 
 [dev-dependencies]
+pito-footer = { git = "https://github.com/gmrdad82/pito-footer", tag = "v0.4.0", features = ["crossterm"] }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 
 [[example]]

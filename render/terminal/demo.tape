@@ -21,3 +21,5 @@ Enter
 Sleep 1.2s
 Type "g"
 Sleep 1s
+Ctrl+C
+Sleep 2.4s

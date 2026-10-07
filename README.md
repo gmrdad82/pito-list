@@ -36,7 +36,9 @@ cargo run --example demo --features crossterm
 The demo is the clip above: sample jobs in three sections under a styled
 header, sizes that grow and warm in place, the view following the selection
 as it scrolls, `v` for a range, `g` and `G` for the ends, enter to open and
-`q` to quit. Its recording is kept in `render/`.
+ctrl+c twice to quit, as in every PITO terminal app (the quit guard comes from
+[pito-footer](https://github.com/gmrdad82/pito-footer)). Its recording is kept
+in `render/`.
 
 ## What it does
 
