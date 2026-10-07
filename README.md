@@ -1,5 +1,8 @@
 # pito-list
 
+![The demo example: jobs in sections, sizes that grow in place, a selected range and the view following the selection to the end](docs/demo.gif)
+
+The list behind the [PITO](https://pitomd.com) terminal apps, as a crate.
 Selectable list rows for ratatui apps, in the style of HEY's terminal UI: the
 selected row is drawn as a bold "▌ " marker plus its text in the app's selected
 style, the other rows as two blank cells plus their cells in their own styles,
@@ -17,6 +20,17 @@ conversion turns Alt, Super, Meta or Hyper on a non-character key into
 `Key::Other`, keeps Alt apart on a character (`Key::Alt('y')`), and passes
 Ctrl+Alt plus a character on as that character, which is how AltGr arrives on
 some platforms, so diacritics can still be typed.
+
+## Try it
+
+```sh
+cargo run --example demo --features crossterm
+```
+
+The demo is the clip above: sample jobs in three sections under a styled
+header, sizes that grow and warm in place, the view following the selection
+as it scrolls, `v` for a range, `g` and `G` for the ends, enter to open and
+`q` to quit. Its recording is kept in `render/`.
 
 ## What it does
 
@@ -392,3 +406,19 @@ fn main() {
     assert_eq!(files.len(), 50_001);
 }
 ```
+
+## Development
+
+`bin/gate` runs `cargo fmt --check`, `cargo clippy --all-targets
+--all-features -- -D warnings`, every test with `cargo nextest` (the tests
+draw into ratatui buffers, and a counting allocator holds that a warm frame
+allocates nothing), this README's example as a doctest, and the release build
+of the bench example. `bin/gate --fast` leaves the bench build out. Issues and
+pull requests are welcome; a change comes with `bin/gate` passing.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE); the code is Catalin Ilinca's. The MIT grant
+covers the code only: the PITO name and its logos stay his, all rights
+reserved. The look is in the style of HEY's terminal UI; see
+[NOTICE.md](NOTICE.md).
