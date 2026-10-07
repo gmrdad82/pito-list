@@ -577,5 +577,6 @@ word, style and key to the app. Report a security issue privately, as
 
 The code is MIT licensed, © Catalin Ilinca: see [LICENSE](LICENSE). The MIT
 grant covers the code only: the PITO name and its logos are © Catalin Ilinca,
-all rights reserved, and are not covered by it. The look is in the style of
-HEY's terminal UI; see [NOTICE.md](NOTICE.md).
+all rights reserved, and are not covered by it; see
+[TRADEMARKS.md](TRADEMARKS.md). The look is in the style of HEY's terminal UI;
+see [NOTICE.md](NOTICE.md).
