@@ -33,7 +33,7 @@ brightWhite = "#a6adc8"
 
 [shots.demo]
 kind = "clip"
-line = "The demo example: sections, a moving selection, a range, live sizes and the view following to the end"
+line = "The demo example: sections, a moving selection, a range, live sizes and the view following to the end with a scrollbar and a count of the rows on screen"
 tape = "render/terminal/demo.tape"
 launch = "demo"
 settle = "1s"

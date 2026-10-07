@@ -156,6 +156,9 @@ pub struct List<S = Vec<Row>> {
     paging: Paging,
     placed: [(usize, u16, u16); MAX_COLUMNS],
     placed_len: usize,
+    shown: Option<(usize, usize, usize)>,
+    cut: bool,
+    bar: bool,
 }
 
 impl Default for List {
@@ -231,6 +234,9 @@ impl<S: Source> List<S> {
             paging: Paging::Cursor,
             placed: [(0, 0, 0); MAX_COLUMNS],
             placed_len: 0,
+            shown: None,
+            cut: false,
+            bar: false,
         }
     }
 
@@ -316,6 +322,20 @@ impl<S: Source> List<S> {
 
     pub fn columns(&self) -> &[(usize, u16, u16)] {
         &self.placed[..self.placed_len]
+    }
+
+    pub fn shown(&self) -> Option<(usize, usize, usize)> {
+        self.shown
+    }
+
+    pub fn position(&self) -> Option<(usize, usize)> {
+        Some((self.selected()?.saturating_add(1), self.source.len()))
+    }
+
+    pub(crate) fn drawn(&mut self, shown: Option<(usize, usize, usize)>, cut: bool, bar: bool) {
+        self.shown = shown;
+        self.cut = cut;
+        self.bar = bar;
     }
 
     pub(crate) fn place(&mut self, placed: impl IntoIterator<Item = (usize, u16, u16)>) {
@@ -451,7 +471,9 @@ impl<S: Source> List<S> {
 
     pub fn hit(&self, area: Rect, header: bool, column: u16, row: u16) -> Option<usize> {
         let first = area.y.saturating_add(u16::from(header));
-        if column < area.x || column >= area.right() || row < first || row >= area.bottom() {
+        let right = area.right().saturating_sub(u16::from(self.bar));
+        let bottom = area.bottom().saturating_sub(u16::from(self.cut));
+        if column < area.x || column >= right || row < first || row >= bottom {
             return None;
         }
         let index = self.top.saturating_add(usize::from(row - first));

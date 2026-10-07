@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+mod bar;
 mod column;
 mod key;
 mod list;
@@ -8,6 +9,7 @@ mod shared;
 mod text;
 mod view;
 
+pub use bar::{Bar, Count, Place};
 pub use column::Column;
 pub use key::Key;
 pub use list::{Keys, List, Paging, Source, Step};

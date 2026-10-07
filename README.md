@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml)
 
-![The demo example: jobs in sections, sizes that grow in place, a selected range and the view following the selection to the end](docs/demo.gif)
+![The demo example: jobs in sections, sizes that grow in place, a selected range, and the view following the selection to the end with a scrollbar and a count of the rows on screen](docs/demo.gif)
 
 The list behind the [PITO](https://pitomd.com) terminal apps, as a crate.
 Selectable list rows for ratatui apps, in the style of HEY's terminal UI: the
@@ -17,7 +17,7 @@ comes from the app, so any language works.
 It isn't on crates.io; add it from git, pinned to a release tag:
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.7.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v0.8.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -35,10 +35,11 @@ cargo run --example demo --features crossterm
 
 The demo is the clip above: sample jobs in three sections under a styled
 header, sizes that grow and warm in place, the view following the selection
-as it scrolls, `v` for a range, `g` and `G` for the ends, enter to open and
-ctrl+c twice to quit, as in every PITO terminal app (the quit guard comes from
-[pito-footer](https://github.com/gmrdad82/pito-footer)). Its recording is kept
-in `render/`.
+as it scrolls with a scrollbar and the rows on screen counted at its foot,
+`v` for a range, ctrl+d and ctrl+u to page, `g` and `G` for the ends, enter
+to open and ctrl+c twice to quit, as in every PITO terminal app (the quit
+guard comes from [pito-footer](https://github.com/gmrdad82/pito-footer)). Its
+recording is kept in `render/`.
 
 ## What it does
 
@@ -135,6 +136,45 @@ in `render/`.
   view moves by the same rows as the selection, so the selection stays on its
   screen line until the list's start or end stops the view. `scroll_to(top)`
   moves the offset itself; the next draw still keeps the selection in view.
+- **A scrollbar.** `ListView::scrollbar(Some(Bar::LINE))` draws a slim bar in
+  the list's last column when its lines (the rows and the end line) don't fit
+  the rows' area; when they fit, nothing changes. The list gives that column
+  up: the rows, the selected row's highlight and `columns()` stop one cell
+  short of it, and `hit` names no row in it. The bar runs beside the rows,
+  under the header line; a dim track with a thumb sized by the share of the
+  lines on screen and placed by the offset, at the top only when the view is,
+  at the bottom only when it is at the end. It reads only the length and the
+  offset, so a lazy or shared list of 100,000 items builds no row for it.
+  `Bar::LINE` is a light "│" track and a heavy "┃" thumb whose ends move by
+  half a cell ("╽" and "╿"); `Bar::new(track, thumb)` takes any single-cell
+  glyphs, and `.halves(top, bottom)` the two glyphs for a cell the thumb
+  covers only the lower or the upper half of (without them, the thumb moves
+  by whole cells). The track takes `Styles::track` (the faint style unless
+  set) and the thumb `Styles::thumb` (unless set, the marker's: the cursor
+  style, else the selected one), drawn over the base.
+- **A count of the rows on screen.** `ListView::count(Some(count))` writes
+  "23–83 of 340" when the list overflows, in the app's words and number format:
+  `Count::new("–", " of ")` puts the first word between the first and last
+  numbers and the second before the total, and `.group(",")` separates the
+  thousands ("1,693–1,701 of 3,400"; none by default); a single row on screen
+  shows as "83 of 340". With `Place::Line` (the default) the list gives up its
+  bottom line to it and right-aligns it there; with `.place(Place::Foot)` it
+  takes no line and sits at the right end of the last line, beside the
+  scrollbar's foot, only when it fits after what that line shows (with a
+  cell to spare), so it shows beside a short row or the end line and steps
+  aside for a long one. It takes `Styles::count`, the faint style unless set.
+  It is written into a small buffer on the stack, so drawing it allocates
+  nothing; a label over 128 bytes is not drawn.
+- **Where the view is.** After a draw, `List::shown()` is the first and last
+  row on screen and the length, counted from 1 as a label reads
+  (`Some((23, 83, 340))`), or `None` before the first draw and for an empty
+  list; `List::position()` is the selected row's place counted from 1 and the
+  length (`Some((12, 340))`). An app that shows the count in its own header
+  facts or footer formats it with the same words through
+  `count.label(first, last, total)`, which is `Display`. Both count lines, so
+  section headings and blank rows count as rows; an app with sections that
+  wants items only counts them from its own data. Draw the list before the
+  line that shows them, since `shown()` answers for the last draw.
 - **Lazy rows.** `List::from_source(source)` takes any `Source`: a length and
   a row by index (`Cow::Owned` for a row built on demand, `Cow::Borrowed` for
   one it holds), so a list of tens of thousands of entries builds only the
@@ -216,7 +256,7 @@ in `render/`.
   j/k, g/G and ctrl+u/ctrl+d, and any set can be replaced.
 - **Clicks.** `List::hit(area, header, column, row)` names the row under a
   terminal cell, following the scroll, or `None` for the header, a section,
-  the end line or a blank line.
+  the end line, a blank line, the scrollbar's column or the count's line.
 - **Widths by cell.** Unicode widths throughout, so diacritics (ă, î, ș, ț),
   "…" and wide glyphs measure, pad and clip cleanly; a wide glyph is never cut
   in half. A newline, tab or carriage return inside a text is drawn as one
@@ -224,9 +264,10 @@ in `render/`.
 - **Cheap.** Drawing writes straight into the buffer and allocates nothing
   beyond what a lazy source's own rows do; a 20,000-row list at 150×40 draws
   in about 0.2 ms, and so does a lazy 100,000-row list in groups, a shared
-  100,000-item vector built on demand and handed over every frame, and the
-  owned list with a range, kept colours, a styled header and rows rewritten
-  every frame; with four columns that fit their cells it takes about 0.26 ms
+  100,000-item vector built on demand and handed over every frame with a
+  scrollbar and a count, and the owned list with a range, kept colours, a
+  styled header and rows rewritten every frame; with four columns that fit
+  their cells it takes about 0.26 ms
   (`cargo run --release --example bench`). Only the rows on screen are
   visited.
 
@@ -235,9 +276,11 @@ in `render/`.
 ```text
 pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
                Left, Right, Up, Down, Home, End, PageUp, PageDown, Delete, Other }   // non_exhaustive
-pub struct Styles { selected, ink, faint, base, header, header_key, cursor, keep }   // non_exhaustive
+pub struct Styles { selected, ink, faint, base, header, header_key, cursor, keep,
+                    track, thumb, count }                                           // non_exhaustive
   Styles::new(); .selected(Style) .ink(Style) .faint(Style) .base(Style)
                  .header(Style) .header_key(Style) .cursor(Style) .keep_colours(bool)
+                 .track(Style) .thumb(Style) .count(Style)
 Part::new(text) | From<&str> | From<String>;  .faint() .style(Style); text()
 Cell::new(text) | Cell::parts(parts) | From<&str> | From<String>;
                                               .faint() .style(Style) .rest(); text()
@@ -250,6 +293,11 @@ pub struct Keys { up, down, page_up, page_down, first, last, open: &'static [Key
   Keys::new(), Keys::VIM; .up(..) .down(..) .page_up(..) .page_down(..) .first(..) .last(..) .open(..)
 pub enum Step { Pass, Held, Moved, Open(usize) }                                      // non_exhaustive
 pub enum Paging { Cursor, View }                                                      // non_exhaustive
+pub struct Bar<'a> { track, thumb, halves }                                           // non_exhaustive
+  Bar::LINE, Bar::new(track: &str, thumb: &str).halves(top: &str, bottom: &str); Default is LINE
+pub enum Place { Line, Foot }                                                         // non_exhaustive
+pub struct Count<'a> { to, of, group, place }                                         // non_exhaustive
+  Count::new(to: &str, of: &str).group(&str).place(Place); label(first, last, total) -> impl Display
 pub trait Source {
   fn len(&self) -> usize;  fn row(&self, index: usize) -> Cow<'_, Row>;
   fn is_empty(&self) -> bool;  fn selectable(&self, index: usize) -> bool;  fn mark_width(&self) -> u16;
@@ -268,24 +316,26 @@ List::from_source(source).keys(Keys).paging(Paging)             // List<S> for a
   source(), set_source(source), update(|source| ..)
   len(), is_empty(), selected() -> Option<usize>, select(index), top(), scroll_to(top), page()
   columns() -> &[(usize, u16, u16)]           // (column index, x, width) of each column drawn
+  shown() -> Option<(usize, usize, usize)>     // first and last row on screen and the length, from 1
+  position() -> Option<(usize, usize)>         // the selected row from 1 and the length
   select_range(Option<(usize, usize)>), range() -> Option<(usize, usize)>
   up(), down(), page_up(), page_down(), first(), last() -> Step
   key(Key) -> Step
   hit(area, header, column, row) -> Option<usize>
 ListView::new(&mut List<S>, &[Column])         // Widget
   .styles(Styles).cursor(&str).gap(u16).header(bool).key_column(Option<usize>)
-  .end(Option<&str>).empty(Option<&str>)
+  .end(Option<&str>).empty(Option<&str>).scrollbar(Option<Bar>).count(Option<Count>)
 pub const CURSOR: &str;                        // "▌ ", the default marker
 pub const MAX_COLUMNS: usize;                  // 32; a column past it is ignored
 ```
 
-`Styles`, `Part`, `Cell`, `Mark`, `Row`, `Column`, `Keys`, `Key`, `Step` and
-`Paging` are `#[non_exhaustive]`: match enums with a wildcard arm and build the structs
+`Styles`, `Part`, `Cell`, `Mark`, `Row`, `Column`, `Keys`, `Key`, `Step`,
+`Paging`, `Bar`, `Count` and `Place` are `#[non_exhaustive]`: match enums with a wildcard arm and build the structs
 with their constructors and methods, so a later release can add to them in a
 minor version.
 
 Drawing takes `&mut List` because it moves the scroll offset to keep the
-selection in view; `page()`, `columns()` and `hit` answer for the last draw. Replace the
+selection in view; `page()`, `columns()`, `shown()` and `hit` answer for the last draw. Replace the
 rows with `set_rows` when the data changes: the selection stays on its index,
 clamped to the new length, and moves to the nearest row when that index is a
 section. A source changed with `update` or `set_source` does the same. The
@@ -299,8 +349,8 @@ instead.
 use std::{borrow::Cow, fmt::Write, sync::Arc};
 
 use pito_list::{
-    Build, Cell, Column, Key, List, ListView, Mark, Paging, Part, Row, Shared, Source, Step,
-    Styles,
+    Bar, Build, Cell, Column, Count, Key, List, ListView, Mark, Paging, Part, Place, Row, Shared,
+    Source, Step, Styles,
 };
 use ratatui::{
     Frame,
@@ -309,6 +359,7 @@ use ratatui::{
 };
 
 const BOLD: Style = Style::new().add_modifier(Modifier::BOLD);
+const COUNT: Count = Count::new("–", " of ").group(",");
 
 const COLUMNS: [Column; 5] = [
     Column::new("Operation", 10, 18).pinned(),
@@ -397,8 +448,17 @@ fn jobs(frame: &mut Frame, list: &mut List<Shared<Job, Cells>>, jobs: &Arc<Vec<J
     let view = ListView::new(list, &JOBS)
         .header(true)
         .end(Some("· end ·"))
-        .empty(Some("No jobs yet."));
+        .empty(Some("No jobs yet."))
+        .scrollbar(Some(Bar::LINE))
+        .count(Some(COUNT.place(Place::Foot)));
     frame.render_widget(view, area);
+}
+
+fn footer(list: &List<Shared<Job, Cells>>, line: &mut String) {
+    line.clear();
+    if let Some((first, last, total)) = list.shown() {
+        let _ = write!(line, "{}", COUNT.label(first, last, total));
+    }
 }
 
 fn key(list: &mut List, key: Key) -> Option<usize> {
@@ -446,7 +506,9 @@ fn draw(frame: &mut Frame, list: &mut List, files: &mut List<Files>, sort: usize
         .header(true)
         .key_column(Some(sort))
         .end(Some("· end ·"))
-        .empty(Some("Nothing yet."));
+        .empty(Some("Nothing yet."))
+        .scrollbar(Some(Bar::new(" ", "█").halves("▄", "▀")))
+        .count(Some(COUNT));
     frame.render_widget(view, above);
     frame.render_widget(ListView::new(files, &FILES).styles(styles).header(true), below);
     if let (Some(at), Some(&(_, x, width))) = (files.selected(), files.columns().get(1)) {
@@ -486,6 +548,11 @@ fn main() {
     table.select(29_999);
     assert_eq!(table.selected(), Some(29_999));
     assert_eq!(table.source().row(7).cells()[1], Cell::new("7 MB"));
+    let mut line = String::new();
+    footer(&table, &mut line);
+    assert_eq!(line, "");
+    assert_eq!(COUNT.label(23, 83, 1_340).to_string(), "23–83 of 1,340");
+    assert_eq!(COUNT.label(12, 12, 340).to_string(), "12 of 340");
 }
 ```
 

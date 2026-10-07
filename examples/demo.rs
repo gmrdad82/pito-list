@@ -4,7 +4,9 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use pito_footer::{Guard, QuitGuard, Wording};
-use pito_list::{Cell, Column, Key, Keys, List, ListView, Mark, Part, Row, Step, Styles};
+use pito_list::{
+    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Part, Place, Row, Step, Styles,
+};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::Rect,
@@ -15,6 +17,7 @@ const BOLD: Style = Style::new().add_modifier(Modifier::BOLD);
 const FAINT: Style = Style::new().add_modifier(Modifier::DIM);
 const TICK: Duration = Duration::from_millis(120);
 const NOTE: Style = Style::new().fg(Color::Cyan);
+const COUNT: Count = Count::new("–", " of ").place(Place::Foot);
 const HINTS: &str = "↑↓ j k move · v range · enter open · ctrl+c twice quit";
 
 const COLUMNS: [Column; 5] = [
@@ -87,7 +90,7 @@ fn rows() -> Vec<Row> {
         queued("rotate logs", "daily", "ops", "starts at 02:00"),
         queued("resize images", "v2.1", "media", "after build docs"),
         Row::blank(),
-        heading("Done", 5),
+        heading("Done", 15),
         done(
             "update tool",
             "0.1 → 0.2",
@@ -105,6 +108,16 @@ fn rows() -> Vec<Row> {
         .mark(Mark::new("✓").style(Style::new().fg(Color::Green))),
         done("backup config", "nightly", "ops", "88 kB", "finished"),
         done("sync mirrors", "v5", "infra", "9.4 MB", "finished in 3 min"),
+        done("prune cache", "weekly", "ops", "2.1 GB", "freed 2.1 GB"),
+        done("renew certs", "v2", "web", "4 kB", "valid for 90 days"),
+        done("index search", "v8", "data", "310 MB", "finished in 6 min"),
+        done("compact logs", "daily", "ops", "740 MB", "finished"),
+        done("warm cdn", "v1.5", "web", "56 MB", "412 files"),
+        done("vacuum store", "v13", "data", "1.8 GB", "finished in 9 min"),
+        done("rotate keys", "monthly", "infra", "2 kB", "three keys"),
+        done("export stats", "v4", "core", "12 MB", "finished"),
+        done("trim images", "v2.0", "media", "96 MB", "1,204 images"),
+        done("check links", "v1", "docs", "18 kB", "no broken links"),
     ]
 }
 
@@ -216,7 +229,9 @@ impl App {
             .styles(styles())
             .header(true)
             .key_column(Some(3))
-            .end(Some("· end ·"));
+            .end(Some("· end ·"))
+            .scrollbar(Some(Bar::LINE))
+            .count(Some(COUNT));
         frame.render_widget(view, rows);
         if area.height < 2 {
             return;

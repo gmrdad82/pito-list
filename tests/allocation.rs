@@ -7,7 +7,8 @@ use std::{
 };
 
 use pito_list::{
-    Cell, Column, Key, Keys, List, ListView, Mark, Paging, Part, Row, Source, Step, Styles,
+    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Paging, Part, Place, Row, Source,
+    Step, Styles,
 };
 use ratatui::{
     buffer::Buffer,
@@ -351,7 +352,7 @@ fn a_lazy_list_with_fitted_columns_allocates_only_what_its_rows_do() {
 }
 
 #[test]
-fn a_shared_row_vector_handed_over_every_frame_allocates_nothing() {
+fn a_shared_row_vector_handed_over_every_frame_with_a_scrollbar_and_a_count_allocates_nothing() {
     let rows: Arc<Vec<Row>> = Arc::new((0..5_000).map(grouped).collect());
     let mut list = List::from_source(Arc::clone(&rows)).keys(Keys::VIM);
     let mut buffers = sizes();
@@ -361,17 +362,23 @@ fn a_shared_row_vector_handed_over_every_frame_allocates_nothing() {
             .header(true)
             .render(area, buffer);
     }
+    let bars = [Bar::LINE, Bar::new(" ", "█")];
+    let places = [Place::Line, Place::Foot];
     let counted = allocations(|| {
         for round in 0..60usize {
             list.set_source(Arc::clone(&rows));
+            let count = Count::new("–", " of ").group(",").place(places[round % 2]);
             for buffer in &mut buffers {
                 let area = buffer.area;
                 ListView::new(&mut list, &FITTED)
                     .header(round % 2 == 0)
                     .end(Some("· end ·"))
                     .empty(Some("Nothing yet."))
+                    .scrollbar(Some(bars[round % 3 % 2]))
+                    .count(Some(count))
                     .render(area, buffer);
             }
+            std::hint::black_box((list.shown(), list.position()));
             std::hint::black_box(list.key(KEYS[round % KEYS.len()]));
         }
     });

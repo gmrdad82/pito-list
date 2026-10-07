@@ -13,6 +13,8 @@ Down
 Sleep 900ms
 Escape
 Sleep 500ms
+Ctrl+D
+Sleep 900ms
 Type "G"
 Sleep 900ms
 Up

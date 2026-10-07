@@ -4,7 +4,9 @@ use std::hint::black_box;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use pito_list::{Cell, Column, Key, List, ListView, Mark, Part, Row, Shared, Source, Styles};
+use pito_list::{
+    Bar, Cell, Column, Count, Key, List, ListView, Mark, Part, Row, Shared, Source, Styles,
+};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -63,6 +65,7 @@ fn run<S: Source>(
     styles: Styles,
     columns: &[Column],
     key: Option<usize>,
+    scroll: bool,
     mut change: impl FnMut(&mut List<S>, u32),
 ) -> (Duration, Duration) {
     let area = Rect::new(0, 0, WIDTH, HEIGHT);
@@ -84,6 +87,8 @@ fn run<S: Source>(
             .header(true)
             .key_column(key)
             .end(Some("· end ·"))
+            .scrollbar(scroll.then_some(Bar::LINE))
+            .count(scroll.then(|| Count::new("–", " of ").group(",")))
             .render(area, &mut buffer);
         let took = started.elapsed();
         black_box(&buffer);
@@ -113,14 +118,14 @@ fn main() {
         Column::new("Message", 8, 0),
     ];
     let mut owned = List::new().with_rows((0..ROWS).map(row));
-    let (mean, worst) = run(&mut owned, frames, styles, &columns, None, |_, _| {});
+    let (mean, worst) = run(&mut owned, frames, styles, &columns, None, false, |_, _| {});
     println!(
         "pito-list bench: {frames} frames of a {ROWS}-row list at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );
     let mut lazy = List::from_source(Grouped);
-    let (mean, worst) = run(&mut lazy, frames, styles, &columns, None, |_, _| {});
+    let (mean, worst) = run(&mut lazy, frames, styles, &columns, None, false, |_, _| {});
     println!(
         "pito-list bench: {frames} frames of a lazy {LAZY}-row list in groups of {GROUP} at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
@@ -144,6 +149,7 @@ fn main() {
         themed,
         &columns,
         Some(1),
+        false,
         |list, frame| {
             let at = list.selected().unwrap_or(0);
             for line in 0..4 {
@@ -176,9 +182,17 @@ fn main() {
     ];
     let cursor = themed.cursor(Style::new().fg(Color::Rgb(0xff, 0xcf, 0x5c)));
     let mut sized = List::new().with_rows((0..ROWS).map(row));
-    let (mean, worst) = run(&mut sized, frames, cursor, &fitted, Some(0), |list, _| {
-        black_box(list.columns());
-    });
+    let (mean, worst) = run(
+        &mut sized,
+        frames,
+        cursor,
+        &fitted,
+        Some(0),
+        false,
+        |list, _| {
+            black_box(list.columns());
+        },
+    );
     println!(
         "pito-list bench: {frames} frames of a {ROWS}-row list with columns that fit their cells, a cursor style and the drawn columns read at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
@@ -187,11 +201,19 @@ fn main() {
     let items: Arc<Vec<usize>> = Arc::new((0..LAZY).collect());
     let mut shared =
         List::from_source(Shared::new(Arc::clone(&items), |_, &n: &usize| row(n)).marks(1));
-    let (mean, worst) = run(&mut shared, frames, styles, &columns, None, |list, _| {
-        list.update(|shared| shared.set_items(Arc::clone(&items)));
-    });
+    let (mean, worst) = run(
+        &mut shared,
+        frames,
+        styles,
+        &columns,
+        None,
+        true,
+        |list, _| {
+            list.update(|shared| shared.set_items(Arc::clone(&items)));
+        },
+    );
     println!(
-        "pito-list bench: {frames} frames of a shared {LAZY}-item vector built on demand and handed over every frame at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
+        "pito-list bench: {frames} frames of a shared {LAZY}-item vector built on demand and handed over every frame, with a scrollbar and a count, at {WIDTH}x{HEIGHT}: mean {:.1} µs, worst {:.1} µs",
         mean.as_secs_f64() * 1e6,
         worst.as_secs_f64() * 1e6
     );

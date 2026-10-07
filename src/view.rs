@@ -1,9 +1,10 @@
-use std::iter;
+use std::{fmt::Write, iter};
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 
 use crate::{
-    Column, List, Row, Source,
+    Bar, Column, Count, List, Place, Row, Source,
+    bar::{Stack, thumb},
     row::{Kind, Paint},
     text::{self, blank, put, put_runs},
 };
@@ -23,6 +24,9 @@ pub struct Styles {
     pub(crate) header_key: Option<Style>,
     pub(crate) cursor: Option<Style>,
     pub(crate) keep: bool,
+    pub(crate) track: Option<Style>,
+    pub(crate) thumb: Option<Style>,
+    pub(crate) count: Option<Style>,
 }
 
 impl Styles {
@@ -36,6 +40,9 @@ impl Styles {
             header_key: None,
             cursor: None,
             keep: false,
+            track: None,
+            thumb: None,
+            count: None,
         }
     }
 
@@ -76,6 +83,21 @@ impl Styles {
 
     pub const fn keep_colours(mut self, keep: bool) -> Self {
         self.keep = keep;
+        self
+    }
+
+    pub const fn track(mut self, style: Style) -> Self {
+        self.track = Some(style);
+        self
+    }
+
+    pub const fn thumb(mut self, style: Style) -> Self {
+        self.thumb = Some(style);
+        self
+    }
+
+    pub const fn count(mut self, style: Style) -> Self {
+        self.count = Some(style);
         self
     }
 
@@ -250,10 +272,12 @@ fn columns_line<'r, I>(
     layout: &Layout,
     gap: u16,
     mut cell: impl FnMut(usize) -> Option<(I, bool)>,
-) where
+) -> u16
+where
     I: Iterator<Item = (&'r str, Style)> + Clone,
 {
     let mut x = from;
+    let mut ink = 0;
     for at in 0..layout.count {
         if !layout.kept[at] {
             continue;
@@ -262,13 +286,13 @@ fn columns_line<'r, I>(
         if let Some((runs, rest)) = cell(at) {
             if rest {
                 let room = clip.right().saturating_sub(x);
-                put_runs(buf, clip, x, y, room, runs, layout.right[at]);
-                return;
+                return ink.max(put_runs(buf, clip, x, y, room, runs, layout.right[at]));
             }
-            put_runs(buf, clip, x, y, size, runs, layout.right[at]);
+            ink = ink.max(put_runs(buf, clip, x, y, size, runs, layout.right[at]));
         }
         x = x.saturating_add(size).saturating_add(gap);
     }
+    ink
 }
 
 #[derive(Debug)]
@@ -282,6 +306,8 @@ pub struct ListView<'a, S = Vec<Row>> {
     key: Option<usize>,
     end: Option<&'a str>,
     empty: Option<&'a str>,
+    bar: Option<Bar<'a>>,
+    count: Option<Count<'a>>,
 }
 
 impl<'a, S: Source> ListView<'a, S> {
@@ -296,7 +322,19 @@ impl<'a, S: Source> ListView<'a, S> {
             key: None,
             end: None,
             empty: None,
+            bar: None,
+            count: None,
         }
+    }
+
+    pub fn scrollbar(mut self, bar: Option<Bar<'a>>) -> Self {
+        self.bar = bar;
+        self
+    }
+
+    pub fn count(mut self, count: Option<Count<'a>>) -> Self {
+        self.count = count;
+        self
     }
 
     pub fn styles(mut self, styles: Styles) -> Self {
@@ -363,29 +401,30 @@ impl Line<'_> {
         }
     }
 
-    fn row(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) {
+    fn row(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) -> u16 {
         match row.kind {
             Kind::Item => self.item(buf, y, row, lit),
             Kind::Heading => self.heading(buf, y, row),
-            Kind::Blank => {}
+            Kind::Blank => 0,
         }
     }
 
-    fn item(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) {
+    fn item(&self, buf: &mut Buffer, y: u16, row: &Row, lit: Lit) -> u16 {
         let area = self.area;
         let mut x = area.x;
         let room = area.width;
         let chosen = lit != Lit::No;
+        let mut ink = 0;
         if chosen {
             blank(buf, area, x, y, room, self.chosen);
         }
         if lit == Lit::Cursor {
             let style = self.styles.cursor.unwrap_or(self.styles.selected);
-            put(buf, area, x, y, self.indent, self.cursor, style);
+            ink = put(buf, area, x, y, self.indent, self.cursor, style);
         }
         x = x.saturating_add(self.indent);
         if let Some(mark) = &row.mark {
-            put(
+            ink = ink.max(put(
                 buf,
                 area,
                 x,
@@ -393,41 +432,36 @@ impl Line<'_> {
                 self.mark_width,
                 &mark.text,
                 self.paint(mark.paint, chosen),
-            );
+            ));
         }
         x = x.saturating_add(self.lead - self.indent);
-        columns_line(buf, area, y, x, &self.layout, self.gap, |at| {
+        let cells = columns_line(buf, area, y, x, &self.layout, self.gap, |at| {
             let cell = row.cells.get(at)?;
             let runs = cell
                 .pieces()
                 .map(move |(text, paint)| (text, self.paint(paint, chosen)));
             Some((runs, cell.rest))
         });
+        ink.max(cells)
     }
 
-    fn heading(&self, buf: &mut Buffer, y: u16, row: &Row) {
+    fn heading(&self, buf: &mut Buffer, y: u16, row: &Row) -> u16 {
         let Some(cell) = row.cells.first() else {
-            return;
+            return 0;
         };
         let x = self.area.x.saturating_add(self.indent);
         let room = self.area.width.saturating_sub(self.indent);
         let runs = cell
             .pieces()
             .map(|(text, paint)| (text, self.styles.resolve(paint)));
-        put_runs(buf, self.area, x, y, room, runs, false);
+        put_runs(buf, self.area, x, y, room, runs, false)
     }
 
-    fn header(&self, buf: &mut Buffer, y: u16, columns: &[Column], key: Option<usize>) {
+    fn header(&self, buf: &mut Buffer, wide: Rect, columns: &[Column], key: Option<usize>) {
         let styles = self.styles;
+        let y = wide.y;
         if let Some(style) = styles.header {
-            blank(
-                buf,
-                self.area,
-                self.area.x,
-                y,
-                self.area.width,
-                styles.base.patch(style),
-            );
+            blank(buf, wide, wide.x, y, wide.width, styles.base.patch(style));
         }
         let title = styles.header.unwrap_or(styles.faint);
         let x = self.area.x.saturating_add(self.lead);
@@ -440,11 +474,62 @@ impl Line<'_> {
         });
     }
 
-    fn note(&self, buf: &mut Buffer, y: u16, text: &str) {
+    fn note(&self, buf: &mut Buffer, y: u16, text: &str) -> u16 {
         let x = self.area.x.saturating_add(self.indent);
         let room = self.area.width.saturating_sub(self.indent);
-        put(buf, self.area, x, y, room, text, self.styles.faint);
+        put(buf, self.area, x, y, room, text, self.styles.faint)
     }
+
+    fn bar(&self, buf: &mut Buffer, bar: &Bar, x: u16, y: u16, top: usize, lines: usize) {
+        let height = usize::from(self.area.bottom().saturating_sub(y));
+        let unit = if bar.halves.is_some() { 2 } else { 1 };
+        let (start, size) = thumb(top, lines, height, unit);
+        let end = start.saturating_add(size);
+        let track = self.styles.track.unwrap_or(self.styles.faint);
+        let lit = self
+            .styles
+            .thumb
+            .or(self.styles.cursor)
+            .unwrap_or(self.styles.selected);
+        let clip = Rect {
+            x,
+            width: 1,
+            ..self.area
+        };
+        for offset in 0..height {
+            let from = offset * unit;
+            let upper = (start..end).contains(&from);
+            let lower = (start..end).contains(&(from + unit - 1));
+            let at = y.saturating_add(small(offset));
+            match bar.glyph(upper, lower) {
+                Some(glyph) => put(buf, clip, x, at, 1, glyph, lit),
+                None => put(buf, clip, x, at, 1, bar.track, track),
+            };
+        }
+    }
+}
+
+fn label(
+    buf: &mut Buffer,
+    count: &Count,
+    shown: (usize, usize, usize),
+    style: Style,
+    line: Rect,
+    free: Option<u16>,
+) {
+    let mut text = Stack::new();
+    let (first, last, total) = shown;
+    if write!(text, "{}", count.label(first, last, total)).is_err() {
+        return;
+    }
+    let text = text.text();
+    if let Some(free) = free
+        && line.right().saturating_sub(text::cells(text)) < free
+    {
+        return;
+    }
+    let runs = iter::once((text, style));
+    put_runs(buf, line, line.x, line.y, line.width, runs, true);
 }
 
 impl<S: Source> Widget for ListView<'_, S> {
@@ -452,6 +537,7 @@ impl<S: Source> Widget for ListView<'_, S> {
         let area = area.intersection(buf.area);
         if area.is_empty() {
             self.list.place(iter::empty());
+            self.list.drawn(None, false, false);
             return;
         }
         let ListView {
@@ -464,6 +550,8 @@ impl<S: Source> Widget for ListView<'_, S> {
             key,
             end,
             empty,
+            bar,
+            count,
         } = self;
         for y in area.top()..area.bottom() {
             blank(buf, area, area.x, y, area.width, styles.base);
@@ -474,12 +562,28 @@ impl<S: Source> Widget for ListView<'_, S> {
             .saturating_add(mark_width)
             .saturating_add(u16::from(mark_width > 0));
         let y = area.y.saturating_add(u16::from(header));
-        let height = usize::from(area.bottom().saturating_sub(y));
+        let body = area.bottom().saturating_sub(y);
+        let len = list.len();
+        let lines = if len == 0 {
+            0
+        } else {
+            len.saturating_add(usize::from(end.is_some()))
+        };
+        let over = body > 0 && lines > usize::from(body);
+        let count = count.filter(|_| over);
+        let cut = count.is_some_and(|count| count.place == Place::Line && body > 1);
+        let bar = bar.filter(|_| over && area.width > 1);
+        let rows = Rect {
+            width: area.width - u16::from(bar.is_some()),
+            height: area.height - u16::from(cut),
+            ..area
+        };
+        let height = usize::from(rows.bottom().saturating_sub(y));
         let selected = list.follow(height, end.is_some());
-        let mut layout = Layout::new(columns, area.width, lead, gap);
+        let mut layout = Layout::new(columns, rows.width, lead, gap);
         let fitted = fitted(list, columns, &layout, header, height);
-        layout.size(columns, area.width, lead, gap, &fitted);
-        list.place(layout.places(area.x.saturating_add(lead), area.right(), gap));
+        layout.size(columns, rows.width, lead, gap, &fitted);
+        list.place(layout.places(rows.x.saturating_add(lead), rows.right(), gap));
         let line = Line {
             styles,
             chosen: styles.base.patch(styles.selected),
@@ -489,12 +593,13 @@ impl<S: Source> Widget for ListView<'_, S> {
             lead,
             cursor,
             mark_width,
-            area,
+            area: rows,
         };
         if header {
-            line.header(buf, area.y, columns, key);
+            line.header(buf, Rect { height: 1, ..area }, columns, key);
         }
         if list.is_empty() {
+            list.drawn(None, false, false);
             if let Some(text) = empty
                 && height > 0
             {
@@ -502,9 +607,10 @@ impl<S: Source> Widget for ListView<'_, S> {
             }
             return;
         }
-        let len = list.len();
+        let top = list.top();
+        let mut ink = 0;
         for offset in 0..height {
-            let index = list.top().saturating_add(offset);
+            let index = top.saturating_add(offset);
             let at = y.saturating_add(small(offset));
             if index < len {
                 let lit = if selected == Some(index) {
@@ -514,15 +620,53 @@ impl<S: Source> Widget for ListView<'_, S> {
                 } else {
                     Lit::No
                 };
-                line.row(buf, at, &list.row(index), lit);
+                ink = line.row(buf, at, &list.row(index), lit);
                 continue;
             }
+            ink = 0;
             if let Some(text) = end
                 && index == len
             {
-                line.note(buf, at, text);
+                ink = line.note(buf, at, text);
             }
             break;
         }
+        let on = len.saturating_sub(top).min(height);
+        let shown = (on > 0).then(|| (top + 1, top + on, len));
+        list.drawn(shown, cut, bar.is_some());
+        if let Some(bar) = bar {
+            line.bar(buf, &bar, area.right() - 1, y, top, lines);
+        }
+        let (Some(count), Some(shown)) = (count, shown) else {
+            return;
+        };
+        let style = styles.count.unwrap_or(styles.faint);
+        let (at, free) = match count.place {
+            Place::Line if cut => (
+                Rect {
+                    y: rows.bottom(),
+                    height: 1,
+                    ..area
+                },
+                None,
+            ),
+            _ => {
+                let last = y.saturating_add(small(height)).saturating_sub(1);
+                let free = if ink == 0 {
+                    rows.x
+                } else {
+                    ink.saturating_add(1)
+                };
+                (
+                    Rect {
+                        y: last,
+                        height: 1,
+                        ..rows
+                    },
+                    Some(free),
+                )
+            }
+        };
+        label(buf, &count, shown, style, at, free);
     }
 }

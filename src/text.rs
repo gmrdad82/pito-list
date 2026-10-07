@@ -62,8 +62,8 @@ pub(crate) fn put(
     room: u16,
     text: &str,
     style: Style,
-) {
-    put_runs(buf, clip, x, y, room, iter::once((text, style)), false);
+) -> u16 {
+    put_runs(buf, clip, x, y, room, iter::once((text, style)), false)
 }
 
 pub(crate) fn put_runs<'t, I>(
@@ -74,7 +74,8 @@ pub(crate) fn put_runs<'t, I>(
     room: u16,
     runs: I,
     right: bool,
-) where
+) -> u16
+where
     I: Iterator<Item = (&'t str, Style)> + Clone,
 {
     let area = clip.intersection(buf.area);
@@ -86,11 +87,11 @@ pub(crate) fn put_runs<'t, I>(
         (x, room)
     };
     if y < area.top() || y >= area.bottom() || x < area.left() || x >= area.right() {
-        return;
+        return 0;
     }
     let room = usize::from(room.min(area.right() - x));
     if room == 0 {
-        return;
+        return 0;
     }
     let overflow = within(runs.clone(), room).is_none();
     let limit = if overflow { room - 1 } else { room };
@@ -111,5 +112,11 @@ pub(crate) fn put_runs<'t, I>(
     }
     if let (true, Some(style)) = (overflow, cut) {
         buf.set_stringn(x.saturating_add(small(used)), y, ELLIPSIS, 1, style);
+        used += 1;
+    }
+    if used == 0 {
+        0
+    } else {
+        x.saturating_add(small(used))
     }
 }
