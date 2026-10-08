@@ -1,8 +1,9 @@
+<p align="center"><img src="docs/demo.gif" alt="The demo example: jobs in sections, sizes that grow in place, a selected range, and the view following the selection to the end with a scrollbar and a count of the rows on screen"></p>
+
 # pito-list
 
 [![CI](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml)
-
-![The demo example: jobs in sections, sizes that grow in place, a selected range, and the view following the selection to the end with a scrollbar and a count of the rows on screen](docs/demo.gif)
+[![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-list)](https://github.com/gmrdad82/pito-list/tags)
 
 The list behind the [PITO](https://pitomd.com) terminal apps, as a crate.
 Selectable list rows for ratatui apps, in the style of HEY's terminal UI: the
