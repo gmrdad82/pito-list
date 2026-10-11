@@ -563,8 +563,9 @@ fn main() {
 --all-features -- -D warnings`, every test with `cargo nextest` (the tests
 draw into ratatui buffers, and a counting allocator holds that a warm frame
 allocates nothing), this README's example as a doctest, and the release build
-of the bench example. `bin/gate --fast` leaves the bench build out, and CI
-runs it on every push and pull request to main.
+of the bench example. `bin/gate --fast` leaves the bench build out. CI runs
+the whole `bin/gate` on Linux, Windows and macOS on every push, every pull
+request to main and nightly.
 
 ## Contributing
 
