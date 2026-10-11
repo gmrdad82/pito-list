@@ -13,6 +13,8 @@ and the columns pad to align across rows. It's a ratatui 0.30 widget with no
 backend feature, and it has no words of its own: every word, style and key
 comes from the app, so any language works.
 
+Works on Linux, Windows and macOS (CI-tested on all three).
+
 ## Install
 
 It isn't on crates.io; add it from git, pinned to a release tag:
