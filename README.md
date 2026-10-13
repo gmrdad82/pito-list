@@ -5,7 +5,7 @@
 [![CI](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-list)](https://github.com/gmrdad82/pito-list/tags)
 
-The list behind the [PITO](https://pitomd.com) terminal apps, as a crate.
+The list behind the [PITO MD](https://pitomd.com) terminal apps, as a crate.
 Selectable list rows for ratatui apps, in the style of HEY's terminal UI: the
 selected row is drawn as a bold "▌ " marker plus its text in the app's selected
 style, the other rows as two blank cells plus their cells in their own styles,
@@ -40,9 +40,9 @@ The demo is the clip above: sample jobs in three sections under a styled
 header, sizes that grow and warm in place, the view following the selection
 as it scrolls with a scrollbar and the rows on screen counted at its foot,
 `v` for a range, ctrl+d and ctrl+u to page, `g` and `G` for the ends, enter
-to open and ctrl+c twice to quit, as in every PITO terminal app (the quit
-guard comes from [pito-footer](https://github.com/gmrdad82/pito-footer)). Its
-recording is kept in `render/`.
+to open and ctrl+c twice to quit, as in every PITO MD terminal app (the
+quit guard comes from [pito-footer](https://github.com/gmrdad82/pito-footer)).
+Its recording is kept in `render/`.
 
 ## What it does
 
@@ -580,7 +580,7 @@ word, style and key to the app. Report a security issue privately, as
 ## Licence
 
 The code is MIT licensed, © Catalin Ilinca: see [LICENSE](LICENSE). The MIT
-grant covers the code only: the PITO name and its logos are © Catalin Ilinca,
-all rights reserved, and are not covered by it; see
+grant covers the code only: the PITO MD name and its logos are © Catalin
+Ilinca, all rights reserved, and are not covered by it; see
 [TRADEMARKS.md](TRADEMARKS.md). The look is in the style of HEY's terminal UI;
 see [NOTICE.md](NOTICE.md).
