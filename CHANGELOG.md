@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.1 — 2026-10-14
+
+The same API as 1.0.0, with documentation: nothing to change in your code.
+
+### Added
+
+- An install page and ten guides of one task each, in `docs/`: a first list in an app, keys and clicks, columns, sections, ranges, a scrollbar and a count, styles, rows rewritten in place, 100,000 items built on demand, and running the benchmarks. Their examples run as tests.
+- Every release now carries `docs-vX.Y.Z.tar.gz`, those pages with an overview, the changelog and the API reference, built by `bin/docs-bundle`.
+
 ## v1.0.0 — 2026-10-14
 
 pito-list reaches 1.0.0 with the same API as 0.8.0: nothing to change in your code.
