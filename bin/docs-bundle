@@ -65,7 +65,7 @@ done
     sed '1{/^# Changelog$/d}' CHANGELOG.md | sed '1{/^$/d}'
 } > "$docs/changelog.md"
 
-cp docs/demo.gif docs/images/*.png docs/images/*.gif "$docs/images/"
+cp docs/demo.gif docs/images/*.png docs/images/*.gif docs/images/*.svg "$docs/images/"
 
 target=${CARGO_TARGET_DIR:-target}
 RUSTDOCFLAGS='-A rustdoc::broken_intra_doc_links' cargo doc --no-deps --all-features --quiet

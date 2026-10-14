@@ -283,6 +283,8 @@ word, style and key to the app. Report a security issue privately, as
 
 ## Licence
 
+<img src="docs/images/pitomd-wordmark.svg" width="320" alt="PITO MD">
+
 The code is MIT licensed, © Catalin Ilinca: see [LICENSE](LICENSE). The MIT
 grant covers the code only: the PITO MD name and its logos are © Catalin
 Ilinca, all rights reserved, and are not covered by it; see
