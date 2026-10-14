@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.0 — 2026-10-14
+
+pito-list reaches 1.0.0 with the same API as 0.8.0: nothing to change in your code.
+
+### Added
+
+- A new README: every feature shown with a clip, a still or a chart, the measured numbers up front (about 0.3 ms a frame for 20,000 rows, no allocations in a warm frame, 70× faster than a ratatui `Table` built from every row) and a first-use example.
+- `examples/versus.rs`, which draws the same 20,000 items with pito-list and with ratatui's `Table` and prints each one's frame time and allocations.
+- `docs/guide.md`: every feature in detail, the whole API and the full example.
+
+### Changed
+
+- The LICENSE file holds the MIT licence alone, TRADEMARKS.md says the names and logos stay reserved, and the brand reads PITO MD.
+- CI runs the whole gate on Linux, Windows and macOS on every push and nightly.
+
 ## v0.8.0 — 2026-10-08
 
 ### Added
