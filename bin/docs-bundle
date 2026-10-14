@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+repo=pito-list
+version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+tag=${1:-v$version}
+fail() {
+    echo "docs-bundle: $*" >&2
+    exit 1
+}
+[ "$tag" = "v$version" ] || fail "$tag is not Cargo.toml's version, v$version"
+grep -q "^## $tag " CHANGELOG.md || fail "CHANGELOG.md has no section for $tag"
+
+out=tmp/docs-bundle
+docs=$out/docs
+rm -rf "$out"
+mkdir -p "$docs/guides" "$docs/reference" "$docs/images"
+
+page() {
+    awk '
+        /^```/ && !fence { fence = 1; rust = ($0 ~ /^```rust/); if (rust) $0 = "```rust"; print; next }
+        /^```/ && fence { fence = 0; rust = 0; print; next }
+        rust && /^[ \t]*#( |$)/ { next }
+        { print }
+    ' "$1" | sed -E "s/(--tag |tag = \")v[0-9]+\.[0-9]+\.[0-9]+/\1$tag/g"
+}
+
+frontmatter() {
+    printf -- '---\ntitle: "%s"\ndescription: "%s"\nsidebar:\n  order: %s\n---\n\n' "$1" "$2" "$3"
+}
+
+alt=$(sed -n '1s/.*alt="\([^"]*\)".*/\1/p' README.md)
+{
+    frontmatter "$repo" "Selectable list rows for ratatui apps: columns that make room, sections, ranges, a scrollbar and a count, about 0.3 ms a frame and no allocation in a warm frame." 1
+    printf '![%s](images/demo.gif)\n\n' "$alt"
+    awk 'f && /^## / && !/^## At a glance/ { exit } f { print } /^\[!\[Version\]/ { f = 1 }' README.md | sed '1{/^$/d}'
+    cat <<'EOF'
+
+## Where to go next
+
+- [Install](install.md) adds it to your app and runs the demo.
+- [Draw a list in your app](guides/first-list.md) is the first guide; the
+  others each take one task, from columns and sections to 100,000 items.
+- [Every feature and the API](reference/guide.md) has the whole API on one
+  page, and the [generated API reference](api/pito_list/index.html) every item.
+- The [changelog](changelog.md) lists what each release changed.
+EOF
+} > "$docs/index.md"
+
+page docs/install.md > "$docs/install.md"
+for guide in docs/guides/*.md; do
+    page "$guide" > "$docs/guides/$(basename "$guide")"
+done
+
+{
+    frontmatter "Every feature and the API" "Everything pito-list does, its whole public API on one page, and a full example." 1
+    page docs/guide.md | sed -e '1{/^# /d}' -e '2{/^$/d}' \
+        -e 's|\[README\](\.\./README\.md)|[overview](../index.md)|' \
+        -e 's|^## The API$|## The API\n\nThe [generated API reference](../api/pito_list/index.html) documents every item.|'
+} > "$docs/reference/guide.md"
+
+{
+    frontmatter "Changelog" "What each release of $repo changed." 100
+    sed '1{/^# Changelog$/d}' CHANGELOG.md | sed '1{/^$/d}'
+} > "$docs/changelog.md"
+
+cp docs/demo.gif docs/images/*.png docs/images/*.gif "$docs/images/"
+
+target=${CARGO_TARGET_DIR:-target}
+RUSTDOCFLAGS='-A rustdoc::broken_intra_doc_links' cargo doc --no-deps --all-features --quiet
+cp -R "$target/doc" "$docs/api"
+rm -f "$docs/api/.lock"
+find "$docs/api" -name '*.md' -exec sh -c 'mv "$1" "${1%.md}.txt"' _ {} \;
+printf '<!doctype html>\n<meta charset="utf-8">\n<title>%s API</title>\n<meta http-equiv="refresh" content="0; url=pito_list/index.html">\n<a href="pito_list/index.html">pito_list</a>\n' "$repo" > "$docs/api/index.html"
+sed -i -E \
+    -e 's#src="docs/(images/)?([^"/]+)"#src="../../images/\2"#g' \
+    -e "s#href=\"((examples|docs)/[^\"\\#]+|[A-Z_]+\\.md|LICENSE)\"#href=\"https://github.com/gmrdad82/$repo/blob/$tag/\\1\"#g" \
+    "$docs/api/pito_list/index.html"
+
+find "$docs" -name '*.md' | sort | while read -r md; do
+    dir=$(dirname "$md")
+    { grep -oE '\]\([^)#]+\)' "$md" || true; } | sed -E 's/^\]\(//; s/\)$//' | while read -r link; do
+        case $link in
+            http://* | https://* | mailto:*) continue ;;
+            /*) fail "$md links to an absolute path: $link" ;;
+        esac
+        [ -e "$dir/$link" ] || fail "$md links to a missing file: $link"
+    done
+done
+for image in "$docs"/images/*; do
+    name=$(basename "$image")
+    grep -q "$name" NOTICE.md || fail "NOTICE.md doesn't name $name"
+    grep -rqF "images/$name" "$docs" --include='*.md' --include='index.html' || fail "no page uses $name"
+done
+for private in "$PWD" "$HOME"; do
+    ! grep -rqF "$private" "$docs" || fail "the bundle carries a local path"
+done
+
+tarball=tmp/docs-$tag.tar.gz
+epoch=$(git log -1 --format=%ct)
+tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$epoch" -C "$out" -cf - docs | gzip -n > "$tarball"
+echo "$tarball"

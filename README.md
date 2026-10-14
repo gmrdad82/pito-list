@@ -121,13 +121,13 @@ It isn't on crates.io; add it from git, pinned to a release tag. The same line
 works on Linux, Windows and macOS:
 
 ```sh
-cargo add pito-list --git https://github.com/gmrdad82/pito-list --tag v1.0.0
+cargo add pito-list --git https://github.com/gmrdad82/pito-list --tag v1.0.1
 ```
 
 or in `Cargo.toml`:
 
 ```toml
-pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v1.0.0" }
+pito-list = { git = "https://github.com/gmrdad82/pito-list", tag = "v1.0.1" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -240,7 +240,9 @@ on this page is recorded from it with
 
 [docs/guide.md](docs/guide.md) has every feature in detail, the whole API and
 a full example with lazy and shared sources, sections, a scrollbar and a
-count.
+count. [docs/install.md](docs/install.md) and the guides in
+[docs/guides/](docs/guides/) take one task a page, from a first list in an
+app to 100,000 items built on demand.
 
 ## Part of PITO MD
 
@@ -261,11 +263,15 @@ animation). The clips on this page are recorded with
 `bin/gate` runs `cargo fmt --check`, `cargo clippy --all-targets
 --all-features -- -D warnings`, every test with `cargo nextest` (the tests
 draw into ratatui buffers, and a counting allocator holds that a warm frame
-allocates nothing), the examples in this README and the guide as doctests,
-and the release build of the bench example. `bin/gate --fast` leaves the
+allocates nothing), the examples in this README and the pages in `docs/` as
+doctests, and the release build of the bench example. `bin/gate --fast` leaves the
 bench build out. CI runs the whole `bin/gate` on Linux, Windows and macOS on
 every push, every pull request to main and nightly. The charts are drawn from
 the data in `docs/charts/` with `pcmp docs/charts/<name>.toml --out docs/images`.
+`bin/docs-bundle` builds `tmp/docs-vX.Y.Z.tar.gz` for Cargo.toml's version:
+the pages in `docs/`, an overview from the top of this README, the changelog
+and the `cargo doc` API reference, with every image they use. The release
+workflow builds it on every tag and attaches it to the tag's GitHub Release.
 
 ## Contributing
 
