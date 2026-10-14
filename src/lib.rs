@@ -16,3 +16,7 @@ pub use list::{Keys, List, Paging, Source, Step};
 pub use row::{Cell, Mark, Part, Row};
 pub use shared::{Build, Shared};
 pub use view::{CURSOR, ListView, MAX_COLUMNS, Styles};
+
+#[cfg(doctest)]
+#[doc = include_str!("../docs/guide.md")]
+struct Guide;

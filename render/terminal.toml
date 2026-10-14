@@ -39,3 +39,38 @@ launch = "demo"
 settle = "1s"
 closure = { crossfade = 0.4 }
 status = "SHIPPED"
+
+[shots.range]
+kind = "clip"
+line = "A selected range across a section: v starts it, the cursor moves, every row between draws selected"
+tape = "render/terminal/range.tape"
+launch = "demo"
+settle = "1s"
+closure = { crossfade = 0.4 }
+status = "SHIPPED"
+
+[shots.scroll]
+kind = "clip"
+line = "Paging and the ends: the view follows the selection with a scrollbar and the rows on screen counted at its foot"
+tape = "render/terminal/scroll.tape"
+launch = "demo"
+settle = "1s"
+closure = { crossfade = 0.4 }
+status = "SHIPPED"
+
+[shots.live]
+kind = "clip"
+line = "Rows rewritten in place: sizes and messages change and warm every 120 ms while the list stays"
+tape = "render/terminal/live.tape"
+launch = "demo"
+settle = "1s"
+closure = { crossfade = 0.4 }
+status = "SHIPPED"
+
+[shots.narrow]
+kind = "still"
+line = "The same list at 96, 46 and 38 columns (--set grid=46x16 and 38x16): Size drops first, then Version, and the messages clip"
+tape = "render/terminal/narrow.tape"
+launch = "demo"
+settle = "1s"
+status = "SHIPPED"
