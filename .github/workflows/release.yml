@@ -38,7 +38,6 @@ jobs:
             on && /^## / { exit }
             on { print }
           ' CHANGELOG.md > tmp/notes.md
-          printf '\nPin it with:\n\n```toml\npito-list = { git = "https://github.com/%s", tag = "%s" }\n```\n' "$GH_REPO" "$TAG" >> tmp/notes.md
       - name: Attach the docs bundle
         run: |
           gh release view "$TAG" > /dev/null 2>&1 \
