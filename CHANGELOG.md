@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.2 — 2026-10-16
+
+### Changed
+
+- The README shows the PITO MD wordmark under its Licence heading, 320 px wide.
+- The demo example uses pito-footer 1.0.1.
+
 ## v1.0.1 — 2026-10-14
 
 The same API as 1.0.0, with documentation: nothing to change in your code.
