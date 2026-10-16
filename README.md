@@ -255,7 +255,7 @@ notices and confirms at the bottom) and
 [pito-hourglass](https://github.com/gmrdad82/pito-hourglass) (the loading
 animation). The clips on this page are recorded with
 [prec](https://github.com/gmrdad82/prec) and made into GIFs with
-[pconv](https://github.com/gmrdad82/pconv), and the charts are drawn by
+pcod from [pito-codecs](https://github.com/gmrdad82/pito-codecs), and the charts are drawn by
 [pito-compare](https://github.com/gmrdad82/pito-compare).
 
 ## Development

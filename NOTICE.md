@@ -13,7 +13,7 @@ code (see LICENSE); the names and logos in them are as TRADEMARKS.md says.
 
 - `docs/demo.gif`, `docs/images/range.gif`, `docs/images/scroll.gif` and
   `docs/images/live.gif`: clips of `examples/demo.rs`, recorded with prec from
-  the shots in `render/terminal.toml` and made into GIFs with pconv.
+  the shots in `render/terminal.toml` and made into GIFs with pcod (pito-codecs).
 - `docs/images/columns-96.png`, `docs/images/columns-46.png` and
   `docs/images/columns-38.png`: stills of `examples/demo.rs` at 96, 46 and 38
   columns, rendered with prec from the `narrow` shot.
