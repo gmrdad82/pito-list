@@ -2,7 +2,6 @@
 
 # pito-list
 
-[![CI](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-list/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-list)](https://github.com/gmrdad82/pito-list/tags)
 
 The list behind the [PITO MD](https://pitomd.com) terminal apps, as a crate:
@@ -17,7 +16,7 @@ It is fast and stays fast as the list grows: **about 0.3 ms a frame** for a
 **zero heap allocations** in a warm frame. Drawing the same 20,000 items, it
 is **70× faster** than a ratatui `Table` built from every row.
 
-Works on Linux, Windows and macOS (CI-tested on all three).
+Works on Linux, Windows and macOS.
 
 ## At a glance
 
@@ -35,7 +34,7 @@ Measured once on 2026-10-14 on an AMD Ryzen 9 9950X under Linux, Rust 1.97.1,
 release profile, with `cargo run --release --example bench` and
 `cargo run --release --example versus`; the build time with
 `cargo build --release --lib` into an empty target folder. Windows and macOS
-are tested by CI but weren't timed.
+weren't timed.
 
 ## Sections, a selection and a range
 
@@ -265,13 +264,12 @@ pcod from [pito-codecs](https://github.com/gmrdad82/pito-codecs), and the charts
 draw into ratatui buffers, and a counting allocator holds that a warm frame
 allocates nothing), the examples in this README and the pages in `docs/` as
 doctests, and the release build of the bench example. `bin/gate --fast` leaves the
-bench build out. CI runs the whole `bin/gate` on Linux, Windows and macOS on
-every push, every pull request to main and nightly. The charts are drawn from
+bench build out. The charts are drawn from
 the data in `docs/charts/` with `pcmp docs/charts/<name>.toml --out docs/images`.
 `bin/docs-bundle` builds `tmp/docs-vX.Y.Z.tar.gz` for Cargo.toml's version:
 the pages in `docs/`, an overview from the top of this README, the changelog
-and the `cargo doc` API reference, with every image they use. The release
-workflow builds it on every tag and attaches it to the tag's GitHub Release.
+and the `cargo doc` API reference, with every image they use. Every tag's
+GitHub Release carries it.
 
 ## Contributing
 
