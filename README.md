@@ -18,6 +18,8 @@ is **70× faster** than a ratatui `Table` built from every row.
 
 Works on Linux, Windows and macOS.
 
+Got questions or doubts? Ping me on Discord: https://discord.gg/XsNcn3kYzn
+
 ## At a glance
 
 | | |
