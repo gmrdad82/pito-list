@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use pito_list::{Key, Keys, List, Row, Step};
+use pito_list::{Key, Keys, List, Mods, Named, Row, Step};
 
 const UP: &[Key] = &[Key::Char('k')];
 const DOWN: &[Key] = &[Key::Char('j')];
@@ -137,6 +137,27 @@ fn a_key_in_two_maps_takes_the_first_map_in_the_fixed_order() {
     assert_eq!(list.key(Key::Char(' ')), Step::Moved);
     assert_eq!(list.selected(), Some(4));
     assert_eq!(list.key(Key::Char(' ')), Step::Held);
+}
+
+#[test]
+fn mods_read_back_their_own_modifiers() {
+    assert!(Mods::CTRL.ctrl() && !Mods::CTRL.shift());
+    assert!(!Mods::SHIFT.ctrl() && Mods::SHIFT.shift());
+    assert!(Mods::CTRL_SHIFT.ctrl() && Mods::CTRL_SHIFT.shift());
+    assert_ne!(Mods::CTRL, Mods::SHIFT);
+    assert_ne!(Mods::CTRL, Mods::CTRL_SHIFT);
+    assert_ne!(Mods::SHIFT, Mods::CTRL_SHIFT);
+}
+
+#[test]
+fn mods_print_their_names_in_debug() {
+    assert_eq!(format!("{:?}", Mods::CTRL), "CTRL");
+    assert_eq!(format!("{:?}", Mods::SHIFT), "SHIFT");
+    assert_eq!(format!("{:?}", Mods::CTRL_SHIFT), "CTRL_SHIFT");
+    assert_eq!(
+        format!("{:?}", Key::Mod(Mods::CTRL_SHIFT, Named::PageDown)),
+        "Mod(CTRL_SHIFT, PageDown)"
+    );
 }
 
 #[cfg(feature = "crossterm")]
@@ -276,8 +297,26 @@ mod crossterm_keys {
                 Key::Mod(Mods::CTRL_SHIFT, named),
                 "{code:?}"
             );
-            assert_ne!(key(code, ctrl), plain, "{code:?}");
         }
+    }
+
+    #[test]
+    fn a_converted_key_reads_back_ctrl_and_shift() {
+        let Key::Mod(both, Named::PageDown) = key(
+            KeyCode::PageDown,
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        ) else {
+            panic!("Ctrl+Shift+PageDown is not Key::Mod");
+        };
+        assert!(both.ctrl() && both.shift());
+        let Key::Mod(ctrl, Named::Up) = key(KeyCode::Up, KeyModifiers::CONTROL) else {
+            panic!("Ctrl+Up is not Key::Mod");
+        };
+        assert!(ctrl.ctrl() && !ctrl.shift());
+        let Key::Mod(shift, Named::Enter) = key(KeyCode::Enter, KeyModifiers::SHIFT) else {
+            panic!("Shift+Enter is not Key::Mod");
+        };
+        assert!(!shift.ctrl() && shift.shift());
     }
 
     #[test]
@@ -436,6 +475,12 @@ mod crossterm_keys {
             state: KeyEventState::NONE,
         };
         assert_eq!(Key::from(repeat), Key::Char('j'));
+        let held = KeyEvent {
+            code: KeyCode::PageDown,
+            modifiers: KeyModifiers::CONTROL,
+            ..repeat
+        };
+        assert_eq!(Key::from(held), Key::Mod(Mods::CTRL, Named::PageDown));
         let release = KeyEvent {
             kind: KeyEventKind::Release,
             ..repeat

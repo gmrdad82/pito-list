@@ -140,7 +140,9 @@ some platforms, so diacritics can still be typed. Ctrl and Shift on a named
 key (Tab, Enter, Esc, Backspace, the arrows, Home, End, Page Up, Page Down,
 Delete) arrive as `Key::Mod(mods, named)`, such as
 `Key::Mod(Mods::CTRL, Named::PageDown)`, so an app can bind them; the plain
-key stays `Key::PageDown`. Shift+Tab is `Key::BackTab`.
+key stays `Key::PageDown`. Shift+Tab is `Key::BackTab`. The built-in key maps
+hold only plain keys, so a modified key moves nothing in the list and passes to
+your app unless you map it.
 
 ## First use
 

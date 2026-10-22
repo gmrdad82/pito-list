@@ -41,7 +41,7 @@ pub enum Named {
     Delete,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Mods(u8);
 
 impl Mods {
@@ -57,6 +57,14 @@ impl Mods {
         self.0 & 2 != 0
     }
 
+    const fn name(self) -> &'static str {
+        match (self.ctrl(), self.shift()) {
+            (true, true) => "CTRL_SHIFT",
+            (true, false) => "CTRL",
+            _ => "SHIFT",
+        }
+    }
+
     #[cfg(feature = "crossterm")]
     const fn of(ctrl: bool, shift: bool) -> Option<Mods> {
         match (ctrl, shift) {
@@ -65,6 +73,12 @@ impl Mods {
             (false, true) => Some(Mods::SHIFT),
             (false, false) => None,
         }
+    }
+}
+
+impl std::fmt::Debug for Mods {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
     }
 }
 
