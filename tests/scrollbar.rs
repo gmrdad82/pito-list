@@ -230,7 +230,9 @@ fn custom_halves_draw_at_odd_and_even_thumb_edges() {
     let mut plain = numbered(40);
     plain.select(20);
     let whole = bar(
-        &render(&mut plain, 30, 9, |view| view.scrollbar(Some(Bar::new(" ", "█")))),
+        &render(&mut plain, 30, 9, |view| {
+            view.scrollbar(Some(Bar::new(" ", "█")))
+        }),
         1,
         9,
     );
@@ -345,4 +347,41 @@ fn an_area_taller_or_wider_than_the_buffer_draws_only_inside_it() {
     assert_eq!(text[2], "  row 2         a message");
     assert_eq!(text[3], "");
     assert_eq!(list.shown(), Some((1, 3, 3)));
+}
+
+struct Short {
+    text: String,
+    room: usize,
+}
+
+impl std::fmt::Write for Short {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        if self.text.len() + s.len() > self.room {
+            return Err(std::fmt::Error);
+        }
+        self.text.push_str(s);
+        Ok(())
+    }
+}
+
+#[test]
+fn a_label_into_a_writer_that_fills_up_stops_at_the_first_piece_that_does_not_fit() {
+    use std::fmt::Write as _;
+    let label = COUNT.label(1_234, 5_678, 12_345);
+    let full = "1,234–5,678 of 12,345";
+    for room in 0..full.len() {
+        let mut short = Short {
+            text: String::new(),
+            room,
+        };
+        assert!(write!(short, "{label}").is_err(), "{room}");
+        assert!(full.starts_with(&short.text), "{room}: {}", short.text);
+        assert!(short.text.len() <= room);
+    }
+    let mut short = Short {
+        text: String::new(),
+        room: full.len(),
+    };
+    assert!(write!(short, "{label}").is_ok());
+    assert_eq!(short.text, full);
 }

@@ -215,7 +215,11 @@ fn set_marks_opens_and_closes_the_mark_column() {
     assert_eq!(drawn.marks[2].chars().nth(2), Some('g'));
     list.update(|shared| shared.set_marks(3));
     let drawn = render(&mut list, 30, 4);
-    assert!(drawn.text[2].starts_with("  •   job 2 "), "{:?}", drawn.text);
+    assert!(
+        drawn.text[2].starts_with("  •   job 2 "),
+        "{:?}",
+        drawn.text
+    );
     list.update(|shared| shared.set_marks(0));
     let drawn = render(&mut list, 30, 4);
     assert!(drawn.text[2].starts_with("  job 2 "), "{:?}", drawn.text);

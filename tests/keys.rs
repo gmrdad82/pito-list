@@ -107,7 +107,12 @@ fn a_key_in_no_map_passes_and_moves_nothing() {
 fn an_empty_list_holds_on_its_mapped_keys_and_passes_the_rest() {
     let mut list = List::default().keys(remapped());
     assert!(list.is_empty());
-    for key in [Key::Char('j'), Key::Char('k'), Key::Char('>'), Key::Char('o')] {
+    for key in [
+        Key::Char('j'),
+        Key::Char('k'),
+        Key::Char('>'),
+        Key::Char('o'),
+    ] {
         assert_eq!(list.key(key), Step::Held, "{key:?}");
     }
     assert_eq!(list.key(Key::Down), Step::Pass);

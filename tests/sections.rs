@@ -264,3 +264,31 @@ fn rows_say_whether_they_are_selectable() {
         [Cell::parts([Part::new("x")])]
     );
 }
+
+#[test]
+fn a_trailing_section_sends_select_and_paging_back_to_the_last_item() {
+    let mut list = List::new().with_rows([
+        heading("Running", 2),
+        Row::new(["deploy"]),
+        Row::new(["build"]),
+        Row::blank(),
+    ]);
+    assert_eq!(list.position(), Some((2, 4)));
+    list.select(99);
+    assert_eq!(list.selected(), Some(2));
+    assert_eq!(list.position(), Some((3, 4)));
+    list.select(3);
+    assert_eq!(list.selected(), Some(2));
+    list.select(1);
+    assert_eq!(list.page_down(), Step::Moved);
+    assert_eq!(list.selected(), Some(2));
+    assert_eq!(list.page_down(), Step::Held);
+    assert_eq!(list.selected(), Some(2));
+}
+
+#[test]
+fn a_list_with_no_selection_has_no_position() {
+    assert_eq!(List::new().position(), None);
+    let sections = List::new().with_rows([heading("Nothing", 0), Row::blank()]);
+    assert_eq!(sections.position(), None);
+}
