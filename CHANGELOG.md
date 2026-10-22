@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.0 — 2026-10-22
+
+### Added
+
+- `Key::Mod(Mods, Named)`: with the `crossterm` feature, Ctrl and Shift held with a named key (the arrows, Page Up/Down, Home, End, Enter, Esc, Backspace, Delete, and Ctrl on Tab) now reach your app, for example Ctrl+PageDown as `Key::Mod(Mods::CTRL, Named::PageDown)`. Shift+Tab still arrives as `Key::BackTab`. `Mods` and `Named` are new public types and work in `const` key maps.
+
+### Changed
+
+- Shift or Ctrl held with Up, Down, Page Up/Down, Home or End no longer moves the list, and with Enter no longer opens the row, under the built-in key maps: the key passes back to your app. Bind its `Key::Mod` form in your own key map to bring it back.
+- The README links the Discord server for questions.
+
 ## v1.0.2 — 2026-10-16
 
 ### Changed
