@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1 — 2026-10-23
+
+### Changed
+
+- The README's "Columns that make room" shows one clip of the demo as the terminal narrows from 96 to 38 columns and widens back, Size and Version dropping and returning in priority order, in place of the three stills.
+
 ## v1.1.0 — 2026-10-22
 
 ### Added
