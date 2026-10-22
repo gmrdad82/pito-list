@@ -51,15 +51,14 @@ you ask (`Styles::keep_colours(true)`), and a cell can be several styled parts
 
 ## Columns that make room
 
-<p align="center"><img src="docs/images/columns-96.png" alt="The demo list at 96 columns: Job, Version, Owner, Size and Message all shown"></p>
-<p align="center"><img src="docs/images/columns-46.png" width="372" alt="The same list at 46 columns: the Size column dropped, the messages clipped with an ellipsis"> <img src="docs/images/columns-38.png" width="312" alt="The same list at 38 columns: Size and Version dropped, Job and Owner kept"></p>
+<p align="center"><img src="docs/images/columns.gif" alt="The demo list as the terminal narrows from 96 to 38 columns and widens back: Size drops first, then Version, the messages clip with an ellipsis while Job and Owner stay, and both columns return in order as the width comes back"></p>
 
-The same list at 96, 46 and 38 columns. Each column has a minimum, a
-preferred width and a drop priority: when the width runs out the highest
-priority drops first (Size, then Version here), a `pinned()` column never
-drops, and the flexible column (the message) takes what's left and clips with
-"…". `fit(max)` sizes a column to its widest cell on screen, `right()` aligns
-numbers, and `rest()` lets one cell run across the columns after it (the
+The terminal narrows from 96 to 38 columns and widens back. Each column has a
+minimum, a preferred width and a drop priority: when the width runs out the
+highest priority drops first (Size, then Version here), a `pinned()` column
+never drops, and the flexible column (the message) takes what's left and clips
+with "…". `fit(max)` sizes a column to its widest cell on screen, `right()`
+aligns numbers, and `rest()` lets one cell run across the columns after it (the
 release note above). Widths are Unicode-aware, so diacritics, wide glyphs and
 "…" measure and clip cleanly.
 
