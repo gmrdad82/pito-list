@@ -142,7 +142,27 @@ fn a_key_in_two_maps_takes_the_first_map_in_the_fixed_order() {
 #[cfg(feature = "crossterm")]
 mod crossterm_keys {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-    use pito_list::{Key, Keys, List, Row, Step};
+    use pito_list::{Key, Keys, List, Mods, Named, Row, Step};
+
+    const NAMED: [(KeyCode, Named, Key); 13] = [
+        (KeyCode::Enter, Named::Enter, Key::Enter),
+        (KeyCode::Esc, Named::Esc, Key::Esc),
+        (KeyCode::Backspace, Named::Backspace, Key::Backspace),
+        (KeyCode::Left, Named::Left, Key::Left),
+        (KeyCode::Right, Named::Right, Key::Right),
+        (KeyCode::Up, Named::Up, Key::Up),
+        (KeyCode::Down, Named::Down, Key::Down),
+        (KeyCode::Home, Named::Home, Key::Home),
+        (KeyCode::End, Named::End, Key::End),
+        (KeyCode::PageUp, Named::PageUp, Key::PageUp),
+        (KeyCode::PageDown, Named::PageDown, Key::PageDown),
+        (KeyCode::Delete, Named::Delete, Key::Delete),
+        (KeyCode::Tab, Named::Tab, Key::Tab),
+    ];
+
+    fn rows(count: usize) -> List {
+        List::new().with_rows((0..count).map(|n| Row::new([format!("row {n}")])))
+    }
 
     fn key(code: KeyCode, modifiers: KeyModifiers) -> Key {
         Key::from(KeyEvent::new(code, modifiers))
@@ -221,14 +241,189 @@ mod crossterm_keys {
             (KeyCode::Right, none, Key::Right),
             (KeyCode::Up, none, Key::Up),
             (KeyCode::Down, none, Key::Down),
-            (KeyCode::Down, KeyModifiers::SHIFT, Key::Down),
-            (KeyCode::Up, KeyModifiers::CONTROL, Key::Up),
+            (
+                KeyCode::Down,
+                KeyModifiers::SHIFT,
+                Key::Mod(Mods::SHIFT, Named::Down),
+            ),
+            (
+                KeyCode::Up,
+                KeyModifiers::CONTROL,
+                Key::Mod(Mods::CTRL, Named::Up),
+            ),
             (KeyCode::F(5), none, Key::Other),
             (KeyCode::Insert, none, Key::Other),
             (KeyCode::Null, none, Key::Other),
         ];
         for (code, modifiers, expected) in cases {
             assert_eq!(key(code, modifiers), expected, "{code:?} {modifiers:?}");
+        }
+    }
+
+    #[test]
+    fn ctrl_and_shift_on_every_named_key_reach_the_app() {
+        let ctrl = KeyModifiers::CONTROL;
+        let shift = KeyModifiers::SHIFT;
+        for (code, named, plain) in NAMED {
+            assert_eq!(key(code, KeyModifiers::NONE), plain, "{code:?}");
+            assert_eq!(key(code, ctrl), Key::Mod(Mods::CTRL, named), "{code:?}");
+            if code == KeyCode::Tab {
+                continue;
+            }
+            assert_eq!(key(code, shift), Key::Mod(Mods::SHIFT, named), "{code:?}");
+            assert_eq!(
+                key(code, ctrl | shift),
+                Key::Mod(Mods::CTRL_SHIFT, named),
+                "{code:?}"
+            );
+            assert_ne!(key(code, ctrl), plain, "{code:?}");
+        }
+    }
+
+    #[test]
+    fn shift_is_consumed_by_tab_and_back_tab() {
+        let ctrl = KeyModifiers::CONTROL;
+        let shift = KeyModifiers::SHIFT;
+        let ctrl_back_tab = Key::Mod(Mods::CTRL, Named::BackTab);
+        assert_eq!(key(KeyCode::Tab, shift), Key::BackTab);
+        assert_eq!(key(KeyCode::Tab, ctrl), Key::Mod(Mods::CTRL, Named::Tab));
+        assert_eq!(key(KeyCode::Tab, ctrl | shift), ctrl_back_tab);
+        assert_eq!(key(KeyCode::BackTab, KeyModifiers::NONE), Key::BackTab);
+        assert_eq!(key(KeyCode::BackTab, shift), Key::BackTab);
+        assert_eq!(key(KeyCode::BackTab, ctrl), ctrl_back_tab);
+        assert_eq!(key(KeyCode::BackTab, ctrl | shift), ctrl_back_tab);
+    }
+
+    #[test]
+    fn modifiers_on_chars_alt_super_and_releases_are_unchanged() {
+        let ctrl = KeyModifiers::CONTROL;
+        let shift = KeyModifiers::SHIFT;
+        let alt = KeyModifiers::ALT;
+        assert_eq!(key(KeyCode::Char('J'), shift), Key::Char('J'));
+        assert_eq!(key(KeyCode::Char('c'), ctrl), Key::Ctrl('c'));
+        assert_eq!(key(KeyCode::Char('C'), ctrl | shift), Key::Ctrl('c'));
+        assert_eq!(key(KeyCode::Char('y'), alt), Key::Alt('y'));
+        assert_eq!(key(KeyCode::Char('ă'), ctrl | alt), Key::Char('ă'));
+        assert_eq!(key(KeyCode::F(5), ctrl), Key::Other);
+        assert_eq!(key(KeyCode::Insert, shift), Key::Other);
+        for (code, _, _) in NAMED {
+            assert_eq!(key(code, alt), Key::Other, "{code:?}");
+            assert_eq!(key(code, alt | ctrl), Key::Other, "{code:?}");
+            assert_eq!(key(code, alt | shift), Key::Other, "{code:?}");
+            for held in [KeyModifiers::SUPER, KeyModifiers::HYPER, KeyModifiers::META] {
+                assert_eq!(key(code, held | ctrl), Key::Other, "{code:?} {held:?}");
+                assert_eq!(key(code, held | shift), Key::Other, "{code:?} {held:?}");
+            }
+            let release = KeyEvent {
+                code,
+                modifiers: ctrl,
+                kind: KeyEventKind::Release,
+                state: KeyEventState::NONE,
+            };
+            assert_eq!(Key::from(release), Key::Other, "{code:?}");
+        }
+    }
+
+    #[test]
+    fn a_plain_page_down_still_pages() {
+        let mut list = rows(40);
+        let _ = super::draw(&mut list, 20, 10);
+        assert_eq!(
+            list.key(key(KeyCode::PageDown, KeyModifiers::NONE)),
+            Step::Moved
+        );
+        assert_eq!(list.selected(), Some(list.page()));
+        let mut vim = rows(40).keys(Keys::VIM);
+        let _ = super::draw(&mut vim, 20, 10);
+        assert_eq!(
+            vim.key(key(KeyCode::PageDown, KeyModifiers::NONE)),
+            Step::Moved
+        );
+        assert_eq!(vim.selected(), Some(vim.page()));
+        assert!(vim.page() > 1);
+    }
+
+    #[test]
+    fn ctrl_page_down_passes_under_the_built_in_maps_and_moves_nothing() {
+        for keys in [Keys::new(), Keys::VIM] {
+            let mut list = rows(40).keys(keys);
+            let _ = super::draw(&mut list, 20, 10);
+            list.select(5);
+            for modifiers in [
+                KeyModifiers::CONTROL,
+                KeyModifiers::SHIFT,
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ] {
+                for code in [
+                    KeyCode::PageDown,
+                    KeyCode::PageUp,
+                    KeyCode::Down,
+                    KeyCode::Enter,
+                ] {
+                    assert_eq!(list.key(key(code, modifiers)), Step::Pass, "{code:?}");
+                    assert_eq!(list.selected(), Some(5), "{code:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_app_that_binds_ctrl_page_down_gets_its_step() {
+        const NEXT: &[Key] = &[Key::Mod(Mods::CTRL, Named::PageDown)];
+        const OPEN: &[Key] = &[Key::Mod(Mods::CTRL_SHIFT, Named::Enter)];
+        let mut list = rows(40).keys(Keys::new().page_down(NEXT).open(OPEN));
+        let _ = super::draw(&mut list, 20, 10);
+        assert_eq!(
+            list.key(key(KeyCode::PageDown, KeyModifiers::NONE)),
+            Step::Pass
+        );
+        assert_eq!(list.selected(), Some(0));
+        assert_eq!(
+            list.key(key(KeyCode::PageDown, KeyModifiers::CONTROL)),
+            Step::Moved
+        );
+        let paged = list.page();
+        assert!(paged > 1);
+        assert_eq!(list.selected(), Some(paged));
+        assert_eq!(
+            list.key(key(
+                KeyCode::PageDown,
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT
+            )),
+            Step::Pass
+        );
+        assert_eq!(
+            list.key(key(KeyCode::Enter, KeyModifiers::NONE)),
+            Step::Pass
+        );
+        assert_eq!(
+            list.key(key(KeyCode::Enter, KeyModifiers::CONTROL)),
+            Step::Pass
+        );
+        assert_eq!(
+            list.key(key(
+                KeyCode::Enter,
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT
+            )),
+            Step::Open(paged)
+        );
+    }
+
+    #[test]
+    fn alt_and_super_page_down_stay_other_and_pass() {
+        const NEXT: &[Key] = &[Key::Mod(Mods::CTRL, Named::PageDown)];
+        let mut list = rows(40).keys(Keys::new().page_down(NEXT));
+        let _ = super::draw(&mut list, 20, 10);
+        for held in [
+            KeyModifiers::ALT,
+            KeyModifiers::SUPER,
+            KeyModifiers::ALT | KeyModifiers::CONTROL,
+            KeyModifiers::SUPER | KeyModifiers::CONTROL,
+        ] {
+            let converted = key(KeyCode::PageDown, held);
+            assert_eq!(converted, Key::Other, "{held:?}");
+            assert_eq!(list.key(converted), Step::Pass, "{held:?}");
+            assert_eq!(list.selected(), Some(0), "{held:?}");
         }
     }
 

@@ -58,6 +58,34 @@ with a character passes on as that character, which is how AltGr arrives on
 some platforms, so diacritics can still be typed. A key release is
 `Key::Other`.
 
+Ctrl and Shift on a named key (Tab, Enter, Esc, Backspace, the arrows, Home,
+End, Page Up, Page Down, Delete) arrive as `Key::Mod(mods, named)`, with
+`Mods::CTRL`, `Mods::SHIFT` or `Mods::CTRL_SHIFT`; the same key with neither
+stays its plain variant, such as `Key::PageDown`. Shift+Tab is `Key::BackTab`,
+and Ctrl+Shift+Tab is `Key::Mod(Mods::CTRL, Named::BackTab)`. The built-in
+sets hold only plain keys, so a modified key passes to your app unless you map
+it:
+
+```rust
+use pito_list::{Column, Key, Keys, List, ListView, Mods, Named, Row, Step};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+
+const NEXT_PAGE: &[Key] = &[Key::Mod(Mods::CTRL, Named::PageDown)];
+
+let mut list = List::new().with_rows((1..=40).map(|n| Row::new([format!("item {n}")])));
+let columns = [Column::new("Item", 8, 0)];
+let area = Rect::new(0, 0, 20, 10);
+ListView::new(&mut list, &columns).render(area, &mut Buffer::empty(area));
+
+assert_eq!(list.key(Key::Mod(Mods::CTRL, Named::PageDown)), Step::Pass);
+assert_eq!(list.selected(), Some(0));
+
+let mut list = list.keys(Keys::new().page_down(NEXT_PAGE));
+assert_eq!(list.key(Key::PageDown), Step::Pass);
+assert_eq!(list.key(Key::Mod(Mods::CTRL, Named::PageDown)), Step::Moved);
+assert_eq!(list.selected(), Some(9));
+```
+
 ## Paging that keeps the view still
 
 By default paging moves the selection and the view follows it. With

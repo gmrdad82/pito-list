@@ -11,7 +11,7 @@ mod view;
 
 pub use bar::{Bar, Count, Place};
 pub use column::Column;
-pub use key::Key;
+pub use key::{Key, Mods, Named};
 pub use list::{Keys, List, Paging, Source, Step};
 pub use row::{Cell, Mark, Part, Row};
 pub use shared::{Build, Shared};

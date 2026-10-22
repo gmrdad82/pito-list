@@ -136,7 +136,11 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
 conversion turns Alt, Super, Meta or Hyper on a non-character key into
 `Key::Other`, keeps Alt apart on a character (`Key::Alt('y')`), and passes
 Ctrl+Alt plus a character on as that character, which is how AltGr arrives on
-some platforms, so diacritics can still be typed.
+some platforms, so diacritics can still be typed. Ctrl and Shift on a named
+key (Tab, Enter, Esc, Backspace, the arrows, Home, End, Page Up, Page Down,
+Delete) arrive as `Key::Mod(mods, named)`, such as
+`Key::Mod(Mods::CTRL, Named::PageDown)`, so an app can bind them; the plain
+key stays `Key::PageDown`. Shift+Tab is `Key::BackTab`.
 
 ## First use
 

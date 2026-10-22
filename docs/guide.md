@@ -233,7 +233,11 @@ Everything the crate does, its whole API and a full example. The [README](../REA
 
 ```text
 pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
-               Left, Right, Up, Down, Home, End, PageUp, PageDown, Delete, Other }   // non_exhaustive
+               Left, Right, Up, Down, Home, End, PageUp, PageDown, Delete,
+               Mod(Mods, Named), Other }                                             // non_exhaustive
+pub enum Named { Tab, BackTab, Enter, Esc, Backspace, Left, Right, Up, Down, Home, End,
+                 PageUp, PageDown, Delete }                                          // non_exhaustive
+pub struct Mods;  Mods::CTRL, Mods::SHIFT, Mods::CTRL_SHIFT; ctrl() -> bool, shift() -> bool
 pub struct Styles { selected, ink, faint, base, header, header_key, cursor, keep,
                     track, thumb, count }                                           // non_exhaustive
   Styles::new(); .selected(Style) .ink(Style) .faint(Style) .base(Style)
