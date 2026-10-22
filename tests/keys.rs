@@ -119,6 +119,21 @@ fn an_empty_list_holds_on_its_mapped_keys_and_passes_the_rest() {
     assert_eq!(draw(&mut fresh, 20, 3).text[1], "  Nothing here.");
 }
 
+#[test]
+fn a_key_in_two_maps_takes_the_first_map_in_the_fixed_order() {
+    let mut list = numbered(5).keys(Keys::new().down(DOWN).open(DOWN));
+    assert_eq!(list.key(Key::Char('j')), Step::Moved);
+    assert_eq!(list.selected(), Some(1));
+    let mut list = numbered(5).keys(Keys::new().up(OPEN).open(OPEN));
+    list.select(2);
+    assert_eq!(list.key(Key::Char('o')), Step::Moved);
+    assert_eq!(list.selected(), Some(1));
+    let mut list = numbered(5).keys(Keys::new().last(OPEN).open(OPEN));
+    assert_eq!(list.key(Key::Char(' ')), Step::Moved);
+    assert_eq!(list.selected(), Some(4));
+    assert_eq!(list.key(Key::Char(' ')), Step::Held);
+}
+
 #[cfg(feature = "crossterm")]
 mod crossterm_keys {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};

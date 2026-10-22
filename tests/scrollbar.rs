@@ -218,7 +218,10 @@ fn custom_halves_draw_at_odd_and_even_thumb_edges() {
     let halves = Bar::new(" ", "█").halves("▄", "▀");
     assert_ne!(halves, Bar::new(" ", "█"));
     let mut list = numbered(40);
-    let lines = |list: &mut List| bar(&render(list, 30, 9, |view| view.scrollbar(Some(halves))), 1, 9);
+    let lines = |list: &mut List| {
+        let buf = render(list, 30, 9, |view| view.scrollbar(Some(halves)));
+        bar(&buf, 1, 9)
+    };
     assert_eq!(lines(&mut list), "█▀      ");
     list.select(20);
     assert_eq!(lines(&mut list), "  ▄█    ");
@@ -291,4 +294,55 @@ fn the_foot_count_takes_the_whole_line_under_a_blank_row() {
         view.end(None).count(Some(COUNT.place(Place::Foot)))
     });
     assert_eq!(read(&buf).text[9], "  row 8         a message");
+}
+
+#[test]
+fn a_half_glyph_carries_the_thumb_style_and_the_track_beside_it_does_not() {
+    let halves = Bar::new(" ", "█").halves("▄", "▀");
+    let mut list = numbered(40);
+    list.select(20);
+    let buf = render(&mut list, 30, 9, |view| {
+        view.styles(STYLES.track(BLUE).thumb(RED))
+            .scrollbar(Some(halves))
+    });
+    assert_eq!(bar(&buf, 1, 9), "  ▄█    ");
+    assert_eq!(buf[(29, 3)].symbol(), "▄");
+    assert_eq!(buf[(29, 3)].fg, Color::Red);
+    assert_eq!(buf[(29, 4)].fg, Color::Red);
+    assert_eq!(buf[(29, 2)].fg, Color::Blue);
+    assert_eq!(buf[(29, 5)].fg, Color::Blue);
+    let mut list = numbered(40);
+    let buf = render(&mut list, 30, 9, |view| {
+        view.styles(STYLES.track(BLUE).thumb(RED))
+            .scrollbar(Some(halves))
+    });
+    assert_eq!(buf[(29, 2)].symbol(), "▀");
+    assert_eq!(buf[(29, 2)].fg, Color::Red);
+    assert_eq!(buf[(29, 3)].fg, Color::Blue);
+}
+
+#[test]
+fn an_area_taller_or_wider_than_the_buffer_draws_only_inside_it() {
+    let mut list = numbered(40);
+    let mut buf = Buffer::empty(Rect::new(0, 0, 30, 5));
+    ListView::new(&mut list, &TWO)
+        .styles(STYLES)
+        .header(true)
+        .scrollbar(Some(Bar::LINE))
+        .render(Rect::new(0, 0, 40, 12), &mut buf);
+    assert_eq!(buf.area, Rect::new(0, 0, 30, 5));
+    let text = read(&buf).text;
+    assert_eq!(text[1], "▌ row 0         a message    ┃");
+    assert_eq!(text[4], "  row 3         a message    │");
+    assert_eq!(list.shown(), Some((1, 4, 40)));
+    let mut list = numbered(3);
+    let mut buf = Buffer::empty(Rect::new(0, 5, 30, 4));
+    ListView::new(&mut list, &TWO)
+        .styles(STYLES)
+        .render(Rect::new(0, 0, 30, 20), &mut buf);
+    let text = read(&buf).text;
+    assert_eq!(text[0], "▌ row 0         a message");
+    assert_eq!(text[2], "  row 2         a message");
+    assert_eq!(text[3], "");
+    assert_eq!(list.shown(), Some((1, 3, 3)));
 }
