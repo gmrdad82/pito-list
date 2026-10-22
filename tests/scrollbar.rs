@@ -4,6 +4,7 @@ use std::{cell::Cell as Counter, sync::Arc};
 
 use common::*;
 use pito_list::{Bar, Build, Column, Count, List, ListView, Place, Row, Shared};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 const TWO: [Column<'static>; 2] = [
@@ -176,4 +177,118 @@ fn a_shared_list_draws_its_bar_and_count_building_only_the_rows_on_screen() {
     let text = read(&buf).text;
     assert_eq!(text[11], "                49,992–50,001 of 100,000");
     assert_eq!(bar(&buf, 1, 11), "││││╽╿││││");
+}
+
+const BLUE: Style = Style::new().fg(Color::Blue);
+const RED: Style = Style::new().fg(Color::Red);
+const YELLOW: Style = Style::new().fg(Color::Yellow);
+
+#[test]
+fn track_thumb_and_count_styles_reach_their_cells() {
+    let mut list = numbered(40);
+    let styles = STYLES.track(BLUE).thumb(RED).count(YELLOW);
+    let buf = render(&mut list, 30, 9, |view| {
+        view.styles(styles)
+            .scrollbar(Some(Bar::LINE))
+            .count(Some(COUNT))
+    });
+    assert_eq!(bar(&buf, 1, 8), "┃││││││");
+    assert_eq!(buf[(29, 1)].fg, Color::Red);
+    for y in 2..8 {
+        assert_eq!(buf[(29, y)].fg, Color::Blue, "{y}");
+    }
+    assert_eq!(read(&buf).text[8], "                     1–7 of 40");
+    for x in 21..30 {
+        assert_eq!(buf[(x, 8)].fg, Color::Yellow, "{x}");
+    }
+    assert_eq!(buf[(5, 1)].fg, Color::Magenta);
+    let mut plain = numbered(40);
+    let buf = render(&mut plain, 30, 9, |view| {
+        view.scrollbar(Some(Bar::LINE)).count(Some(COUNT))
+    });
+    assert_eq!(buf[(29, 1)].fg, Color::Magenta);
+    assert_eq!(buf[(29, 2)].fg, Color::Reset);
+    assert!(buf[(29, 2)].modifier.contains(Modifier::DIM));
+    assert!(buf[(29, 8)].modifier.contains(Modifier::DIM));
+    assert_eq!(buf[(29, 8)].fg, Color::Reset);
+}
+
+#[test]
+fn custom_halves_draw_at_odd_and_even_thumb_edges() {
+    let halves = Bar::new(" ", "█").halves("▄", "▀");
+    assert_ne!(halves, Bar::new(" ", "█"));
+    let mut list = numbered(40);
+    let lines = |list: &mut List| bar(&render(list, 30, 9, |view| view.scrollbar(Some(halves))), 1, 9);
+    assert_eq!(lines(&mut list), "█▀      ");
+    list.select(20);
+    assert_eq!(lines(&mut list), "  ▄█    ");
+    list.select(39);
+    assert_eq!(lines(&mut list), "      ▄█");
+    let mut plain = numbered(40);
+    plain.select(20);
+    let whole = bar(
+        &render(&mut plain, 30, 9, |view| view.scrollbar(Some(Bar::new(" ", "█")))),
+        1,
+        9,
+    );
+    assert_eq!(whole, "  ██    ");
+}
+
+#[test]
+fn the_default_bar_is_the_line() {
+    assert_eq!(Bar::default(), Bar::LINE);
+    assert_eq!(Bar::default(), Bar::new("│", "┃").halves("╽", "╿"));
+    let mut a = numbered(40);
+    let mut b = numbered(40);
+    a.select(20);
+    b.select(20);
+    let by_default = render(&mut a, 30, 9, |view| view.scrollbar(Some(Bar::default())));
+    let by_line = render(&mut b, 30, 9, |view| view.scrollbar(Some(Bar::LINE)));
+    assert_eq!(by_default, by_line);
+}
+
+#[test]
+fn a_count_too_long_to_hold_draws_nothing() {
+    let long = "x".repeat(130);
+    let edge = "y".repeat(121);
+    let over = "y".repeat(122);
+    let mut list = numbered(40);
+    let buf = render(&mut list, 30, 9, |view| {
+        view.count(Some(Count::new("–", &long)))
+    });
+    assert_eq!(read(&buf).text[8], "");
+    assert_eq!(list.shown(), Some((1, 7, 40)));
+    assert_eq!(read(&buf).text[7], "  row 6         a message");
+    let mut list = numbered(40);
+    let buf = render(&mut list, 200, 9, |view| {
+        view.count(Some(Count::new("–", &edge)))
+    });
+    let text = &read(&buf).text[8];
+    assert!(text.ends_with(&format!("1–7{edge}40")), "{text}");
+    let mut list = numbered(40);
+    let buf = render(&mut list, 200, 9, |view| {
+        view.count(Some(Count::new("–", &over)))
+    });
+    assert_eq!(read(&buf).text[8], "");
+}
+
+#[test]
+fn the_foot_count_takes_the_whole_line_under_a_blank_row() {
+    let rows = (0..30).map(|n| match n {
+        8 => Row::blank(),
+        n => Row::new([format!("row {n}"), "a message".into()]),
+    });
+    let mut list = List::new().with_rows(rows);
+    let buf = render(&mut list, 30, 10, |view| {
+        view.end(None).count(Some(COUNT.place(Place::Foot)))
+    });
+    let text = read(&buf).text;
+    assert_eq!(text[8], "  row 7         a message");
+    assert_eq!(text[9], "                     1–9 of 30");
+    assert_eq!(list.shown(), Some((1, 9, 30)));
+    let mut filled = numbered(30);
+    let buf = render(&mut filled, 30, 10, |view| {
+        view.end(None).count(Some(COUNT.place(Place::Foot)))
+    });
+    assert_eq!(read(&buf).text[9], "  row 8         a message");
 }

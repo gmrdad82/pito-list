@@ -189,3 +189,101 @@ fn shared_rows_borrow_and_draw_like_owned_rows() {
         std::borrow::Cow::Borrowed(_)
     ));
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct Plain;
+
+impl Build<Job> for Plain {
+    fn row(&self, index: usize, job: &Job) -> Row {
+        row_of(index, job)
+    }
+}
+
+#[test]
+fn set_marks_opens_and_closes_the_mark_column() {
+    let jobs: Arc<Vec<Job>> = Arc::new((1..6).map(job).collect());
+    let mut list = List::from_source(Shared::new(Arc::clone(&jobs), Plain));
+    assert_eq!(list.source().mark_width(), 0);
+    let drawn = render(&mut list, 30, 4);
+    assert!(drawn.text[1].starts_with("▌ job 1 "), "{:?}", drawn.text);
+    assert!(drawn.text[2].starts_with("  job 2 "), "{:?}", drawn.text);
+    list.update(|shared| shared.set_marks(1));
+    assert_eq!(list.source().mark_width(), 1);
+    let drawn = render(&mut list, 30, 4);
+    assert!(drawn.text[1].starts_with("▌ • job 1 "), "{:?}", drawn.text);
+    assert!(drawn.text[2].starts_with("  • job 2 "), "{:?}", drawn.text);
+    assert_eq!(drawn.marks[2].chars().nth(2), Some('g'));
+    list.update(|shared| shared.set_marks(3));
+    let drawn = render(&mut list, 30, 4);
+    assert!(drawn.text[2].starts_with("  •   job 2 "), "{:?}", drawn.text);
+    list.update(|shared| shared.set_marks(0));
+    let drawn = render(&mut list, 30, 4);
+    assert!(drawn.text[2].starts_with("  job 2 "), "{:?}", drawn.text);
+}
+
+#[test]
+fn items_hands_back_the_shared_vector() {
+    let jobs: Arc<Vec<Job>> = Arc::new((1..4).map(job).collect());
+    let shared = Shared::new(Arc::clone(&jobs), Plain);
+    assert!(Arc::ptr_eq(shared.items(), &jobs));
+    assert_eq!(shared.items().len(), 3);
+    assert_eq!(shared.items()[1].name, "job 2");
+    let mut list = List::from_source(shared);
+    let fresh: Arc<Vec<Job>> = Arc::new((7..9).map(job).collect());
+    list.update(|shared| shared.set_items(Arc::clone(&fresh)));
+    assert!(Arc::ptr_eq(list.source().items(), &fresh));
+    assert!(!Arc::ptr_eq(list.source().items(), &jobs));
+    assert_eq!(Arc::strong_count(&jobs), 1);
+}
+
+#[test]
+fn a_clone_shares_the_same_items_and_keeps_its_own_marks() {
+    let jobs: Arc<Vec<Job>> = Arc::new((1..4).map(job).collect());
+    let shared = Shared::new(Arc::clone(&jobs), Plain).marks(2);
+    let mut copy = shared.clone();
+    assert!(Arc::ptr_eq(shared.items(), copy.items()));
+    assert_eq!(Arc::strong_count(&jobs), 3);
+    assert_eq!(copy.mark_width(), 2);
+    assert_eq!(copy.builder(), shared.builder());
+    copy.set_marks(0);
+    assert_eq!(copy.mark_width(), 0);
+    assert_eq!(shared.mark_width(), 2);
+    drop(copy);
+    assert_eq!(Arc::strong_count(&jobs), 2);
+}
+
+#[test]
+fn a_default_shared_is_empty_and_draws_no_rows() {
+    let shared: Shared<Job, Plain> = Shared::default();
+    assert_eq!(shared.len(), 0);
+    assert!(shared.is_empty());
+    assert_eq!(shared.mark_width(), 0);
+    assert!(shared.items().is_empty());
+    let mut list = List::from_source(shared);
+    assert_eq!(list.selected(), None);
+    assert_eq!(list.key(Key::Down), pito_list::Step::Held);
+    let drawn = render(&mut list, 30, 4);
+    assert_eq!(drawn.text[1], "  No jobs.");
+    assert_eq!(drawn.text[2], "");
+    assert_eq!(drawn.text[3], "");
+    assert_eq!(list.shown(), None);
+}
+
+#[test]
+fn debug_prints_the_length_and_marks_never_an_item() {
+    let jobs: Arc<Vec<Job>> = Arc::new(vec![Job {
+        name: "secret payroll".into(),
+        kb: 77_777,
+        group: false,
+    }]);
+    let shared = Shared::new(Arc::clone(&jobs), Plain).marks(4);
+    let printed = format!("{shared:?}");
+    assert_eq!(printed, "Shared { len: 1, marks: 4, .. }");
+    assert!(!printed.contains("secret"));
+    assert!(!printed.contains("77777"));
+    let closure = Shared::new(jobs, |index, job: &Job| row_of(index, job));
+    assert_eq!(format!("{closure:?}"), "Shared { len: 1, marks: 0, .. }");
+    let pretty = format!("{:#?}", Shared::<Job, Plain>::default());
+    assert!(pretty.contains("len: 0"), "{pretty}");
+    assert!(!pretty.contains("items"), "{pretty}");
+}
