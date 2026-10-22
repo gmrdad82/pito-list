@@ -74,3 +74,12 @@ tape = "render/terminal/narrow.tape"
 launch = "demo"
 settle = "1s"
 status = "SHIPPED"
+
+[shots.columns]
+kind = "clip"
+line = "The terminal eases from 96 to 38 columns and back: Size drops first, then Version, the messages clip, and both columns return as the width comes back"
+tape = "render/terminal/columns.tape"
+launch = "demo"
+settle = "1s"
+closure = { crossfade = 0.4 }
+status = "SHIPPED"
