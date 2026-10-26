@@ -97,10 +97,7 @@ fn a_heading_spans_the_row_from_the_marks_and_clips_as_one() {
         Row::new(["x", "y", "z"]),
     ]);
     let drawn = draw_with(&mut list, &columns, 30, 2, |view| view);
-    assert_eq!(
-        drawn.text,
-        ["  a heading wider than any co…", "▌ x    y    z"]
-    );
+    assert_eq!(drawn.text, ["  a heading wider than any…", "▌ x    y    z"]);
 }
 
 #[test]

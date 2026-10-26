@@ -34,15 +34,15 @@ fn a_cell_of_parts_clips_as_one() {
         Part::new("fghij").faint(),
     ]));
     let drawn = draw_with(&mut list, &TWO, 20, 2, |view| view.styles(STYLES));
-    assert_eq!(drawn.text[1], "  abcdefg…  x");
-    assert_eq!(drawn.marks[1], "..gggggfff");
+    assert_eq!(drawn.text[1], "  …         x");
+    assert_eq!(drawn.marks[1], "..g");
     let mut list = two(Cell::parts([
         Part::new("abcdefghij").style(GREEN),
         Part::new("zz").faint(),
     ]));
     let drawn = draw_with(&mut list, &TWO, 20, 2, |view| view.styles(STYLES));
-    assert_eq!(drawn.text[1], "  abcdefg…  x");
-    assert_eq!(drawn.marks[1], "..gggggggg");
+    assert_eq!(drawn.text[1], "  …         x");
+    assert_eq!(drawn.marks[1], "..g");
     let mut list = two(Cell::parts(["日本", "語日本語"]));
     let drawn = draw_with(&mut list, &TWO, 20, 2, |view| view.styles(STYLES));
     assert_eq!(drawn.text[1], "  日本語…   x");
@@ -119,12 +119,12 @@ fn a_rest_cell_spans_to_the_end_of_the_row() {
         [
             "  Name      Size  Owner   Note",
             "▌ ab          12  me      first",
-            "  cd      a description that runs acros…",
+            "  cd      a description that runs…",
             "  ef          34  short",
             "  gh                      last",
         ]
     );
-    assert_eq!(cells(&drawn.text[2]), 40);
+    assert_eq!(cells(&drawn.text[2]), 34);
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn a_rest_cell_drops_with_its_column() {
         columns[3],
     ];
     let drawn = draw_with(&mut list, &pinned, 20, 1, |view| view);
-    assert_eq!(drawn.text, ["▌ cd      a descrip…"]);
+    assert_eq!(drawn.text, ["▌ cd      a…"]);
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn a_flexible_column_can_come_before_number_columns() {
         drawn.text,
         [
             "  Name             Size  Count",
-            "▌ deploy api s…      12      3",
+            "▌ deploy api…        12      3",
             "  build            1024  12345",
         ]
     );
@@ -198,7 +198,7 @@ fn a_flexible_column_can_come_before_number_columns() {
         drawn.text,
         [
             "  Name          Size",
-            "▌ deploy ap…      12",
+            "▌ deploy…         12",
             "  build         1024",
         ]
     );

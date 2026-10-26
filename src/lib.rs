@@ -15,6 +15,7 @@ pub use key::{Key, Mods, Named};
 pub use list::{Keys, List, Paging, Source, Step};
 pub use row::{Cell, Mark, Part, Row};
 pub use shared::{Build, Shared};
+pub use text::cut;
 pub use view::{CURSOR, ListView, MAX_COLUMNS, Styles};
 
 #[cfg(doctest)]
