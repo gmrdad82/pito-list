@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.2.0 — 2026-10-26
+
+### Changed
+
+- Text that doesn't fit is cut after a whole word (or after `/`, `-` or `_` in a name) and ends with "…", never in the middle of a word or right after a number. A value with no room for a whole word shows "…" alone.
+
+### Added
+
+- `pito_list::cut`, so apps can cut their own text the same way.
+
 ## v1.1.1 — 2026-10-23
 
 ### Changed
