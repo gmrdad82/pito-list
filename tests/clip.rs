@@ -106,7 +106,10 @@ fn a_right_column_at_the_edge_aligns_to_the_area() {
     untouched_outside(&buf, area);
     assert_eq!(line(&buf, 0, 0, 20), "  Name          Size");
     assert_eq!(line(&buf, 1, 0, 20), "▌ alpha        12345");
-    assert_eq!(line(&buf, 2, 0, 20), format!("  bravo{}…", " ".repeat(12)));
+    assert_eq!(
+        line(&buf, 2, 0, 20),
+        format!("  bravo{}…{}", " ".repeat(7), " ".repeat(5))
+    );
     assert_eq!(list.columns(), [(0, 2, 10), (1, 14, 6)]);
 }
 

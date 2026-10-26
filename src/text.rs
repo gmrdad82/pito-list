@@ -220,6 +220,7 @@ pub(crate) fn fit<'t>(runs: impl Iterator<Item = &'t str>, room: usize) -> Fit {
     scan.fit(room)
 }
 
+/// Returns `None` when `text` fits in `room` cells; otherwise `Some(kept)`, the longest whole-word (or name-part) prefix that leaves a cell for the "…" the caller draws after it. `kept` may be empty.
 pub fn cut(text: &str, room: usize) -> Option<&str> {
     let keep = fit(iter::once(text), room).keep?;
     let end = text

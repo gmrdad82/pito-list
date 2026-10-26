@@ -63,10 +63,10 @@ for width in [64, 44, 36] {
 #     "▌ deploy api    v1.4       web      12 MB  uploading the bundle",
 #     "  build docs    v0.9       docs    640 kB  waiting for a runner",
 #     "  Job           Version    Owner   Message",
-#     "▌ deploy api    v1.4       web     uploadin…",
-#     "  build docs    v0.9       docs    waiting …",
+#     "▌ deploy api    v1.4       web     …",
+#     "  build docs    v0.9       docs    waiting…",
 #     "  Job           Owner   Message",
-#     "▌ deploy api    web     uploading t…",
+#     "▌ deploy api    web     uploading…",
 #     "  build docs    docs    waiting for…",
 # ]);
 ```
@@ -79,11 +79,11 @@ At 64, 44 and 36 cells, Size drops first (priority 3), then Version (priority 2)
   build docs    v0.9       docs    640 kB  waiting for a runner
 
   Job           Version    Owner   Message
-▌ deploy api    v1.4       web     uploadin…
-  build docs    v0.9       docs    waiting …
+▌ deploy api    v1.4       web     …
+  build docs    v0.9       docs    waiting…
 
   Job           Owner   Message
-▌ deploy api    web     uploading t…
+▌ deploy api    web     uploading…
   build docs    docs    waiting for…
 ```
 
