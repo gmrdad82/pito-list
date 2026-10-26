@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 — 2026-10-26
+
+### Changed
+
+- The demo example uses pito-footer v1.1.0, so its footer text that doesn't fit is cut after a whole word and ends with "…".
+
 ## v1.2.0 — 2026-10-26
 
 ### Changed
