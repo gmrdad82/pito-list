@@ -56,9 +56,10 @@ you ask (`Styles::keep_colours(true)`), and a cell can be several styled parts
 The terminal narrows from 96 to 38 columns and widens back. Each column has a
 minimum, a preferred width and a drop priority: when the width runs out the
 highest priority drops first (Size, then Version here), a `pinned()` column
-never drops, and the flexible column (the message) takes what's left and clips
-with "…". `fit(max)` sizes a column to its widest cell on screen, `right()`
-aligns numbers, and `rest()` lets one cell run across the columns after it (the
+never drops, and the flexible column (the message) takes what's left and cuts
+after a whole word with "…" (`pito_list::cut` gives apps the same cut).
+`fit(max)` sizes a column to its widest cell on screen, `right()` aligns
+numbers, and `rest()` lets one cell run across the columns after it (the
 release note above). Widths are Unicode-aware, so diacritics, wide glyphs and
 "…" measure and clip cleanly.
 
@@ -189,16 +190,16 @@ for width in [44, 24] {
 #   let expected: &[&str] = if width == 44 {
 #       &[
 #           "  Job             Owner    Message",
-#           "  deploy api      web      uploading the bu…",
-#           "▌ build docs      docs     waiting for a ru…",
+#           "  deploy api      web      uploading the…",
+#           "▌ build docs      docs     waiting for a…",
 #           "  rotate logs     ops      starts at 02:00",
 #       ]
 #   } else {
 #       &[
 #           "  Job           Message",
-#           "  deploy api    uploadi…",
+#           "  deploy api    …",
 #           "▌ build docs    waiting…",
-#           "  rotate logs   starts …",
+#           "  rotate logs   starts…",
 #       ]
 #   };
 #   assert_eq!(lines, expected);
@@ -210,14 +211,14 @@ fit):
 
 ```text
   Job             Owner    Message
-  deploy api      web      uploading the bu…
-▌ build docs      docs     waiting for a ru…
+  deploy api      web      uploading the…
+▌ build docs      docs     waiting for a…
   rotate logs     ops      starts at 02:00
 
   Job           Message
-  deploy api    uploadi…
+  deploy api    …
 ▌ build docs    waiting…
-  rotate logs   starts …
+  rotate logs   starts…
 ```
 
 In an app, keep the `List` in your state, draw it with

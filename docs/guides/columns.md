@@ -16,8 +16,13 @@ and Owner stay and the message clips with "…".
 ## Minimum, preferred and priority
 
 `Column::new(title, min, preferred)` makes a column. Every column pads its
-cells to its width so the rows line up, and a cell wider than it is clipped
-with "…". The widths are worked out at each draw:
+cells to its width so the rows line up, and a cell wider than it is cut after
+its last whole word that fits, or after a `/`, `-` or `_` inside a name, and
+ends in "…". A cut never lands inside a word or right after a bare number, a
+cell where no whole word fits shows "…" alone, and parts split by a spaced
+separator such as " · " drop whole. `pito_list::cut(text, room)` gives an app
+the same cut: `None` when the text fits, or the part to keep before the "…".
+The widths are worked out at each draw:
 
 - When the minimums don't all fit, the column with the highest
   `priority(n)` drops first (the later one on a tie). A `pinned()` column
@@ -58,10 +63,10 @@ for width in [64, 44, 36] {
 #     "▌ deploy api    v1.4       web      12 MB  uploading the bundle",
 #     "  build docs    v0.9       docs    640 kB  waiting for a runner",
 #     "  Job           Version    Owner   Message",
-#     "▌ deploy api    v1.4       web     uploadin…",
-#     "  build docs    v0.9       docs    waiting …",
+#     "▌ deploy api    v1.4       web     …",
+#     "  build docs    v0.9       docs    waiting…",
 #     "  Job           Owner   Message",
-#     "▌ deploy api    web     uploading t…",
+#     "▌ deploy api    web     uploading…",
 #     "  build docs    docs    waiting for…",
 # ]);
 ```
@@ -74,11 +79,11 @@ At 64, 44 and 36 cells, Size drops first (priority 3), then Version (priority 2)
   build docs    v0.9       docs    640 kB  waiting for a runner
 
   Job           Version    Owner   Message
-▌ deploy api    v1.4       web     uploadin…
-  build docs    v0.9       docs    waiting …
+▌ deploy api    v1.4       web     …
+  build docs    v0.9       docs    waiting…
 
   Job           Owner   Message
-▌ deploy api    web     uploading t…
+▌ deploy api    web     uploading…
   build docs    docs    waiting for…
 ```
 

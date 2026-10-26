@@ -87,16 +87,16 @@ for width in [44, 24] {
 #   let expected: &[&str] = if width == 44 {
 #       &[
 #           "  Job             Owner    Message",
-#           "  deploy api      web      uploading the bu…",
-#           "▌ build docs      docs     waiting for a ru…",
+#           "  deploy api      web      uploading the…",
+#           "▌ build docs      docs     waiting for a…",
 #           "  rotate logs     ops      starts at 02:00",
 #       ]
 #   } else {
 #       &[
 #           "  Job           Message",
-#           "  deploy api    uploadi…",
+#           "  deploy api    …",
 #           "▌ build docs    waiting…",
-#           "  rotate logs   starts …",
+#           "  rotate logs   starts…",
 #       ]
 #   };
 #   assert_eq!(lines, expected);
@@ -108,14 +108,14 @@ doesn't fit):
 
 ```text
   Job             Owner    Message
-  deploy api      web      uploading the bu…
-▌ build docs      docs     waiting for a ru…
+  deploy api      web      uploading the…
+▌ build docs      docs     waiting for a…
   rotate logs     ops      starts at 02:00
 
   Job           Message
-  deploy api    uploadi…
+  deploy api    …
 ▌ build docs    waiting…
-  rotate logs   starts …
+  rotate logs   starts…
 ```
 
 [Draw a list in your app](guides/first-list.md) puts a list in a real

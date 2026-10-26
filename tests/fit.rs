@@ -55,7 +55,7 @@ fn a_fit_column_takes_its_widest_cell_on_screen() {
         Column::new("Note", 4, 0),
     ];
     let drawn = read(&render(&mut list, &plain, 30, 4, false));
-    assert_eq!(drawn.text[1], "  abc…    22  y");
+    assert_eq!(drawn.text[1], "  …       22  y");
 }
 
 #[test]
@@ -199,7 +199,10 @@ fn a_fit_column_drops_by_priority_and_shares_the_spare_width() {
     assert_eq!(list.columns(), [(0, 2, 10), (1, 14, 6), (2, 22, 18)]);
     let drawn = read(&render(&mut list, &columns, 20, 2, false));
     assert_eq!(list.columns(), [(0, 2, 6), (1, 10, 4), (2, 16, 4)]);
-    assert_eq!(drawn.text[0], "▌ abcde…  123…  x");
+    assert_eq!(
+        drawn.text[0],
+        format!("▌ …{}…{}x", " ".repeat(7), " ".repeat(5))
+    );
     render(&mut list, &columns, 17, 2, false);
     assert_eq!(list.columns(), [(0, 2, 9), (2, 13, 4)]);
 }
