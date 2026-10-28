@@ -65,7 +65,7 @@ release note above). Widths are Unicode-aware, so diacritics, wide glyphs and
 
 ## Scrolling, paging, a scrollbar and a count
 
-<p align="center"><img src="docs/images/scroll.gif" alt="the keys page down twice, G jumps to the end where the end line shows, the keys page up and g goes back to the top, the scrollbar's thumb and the count at its foot following"></p>
+<p align="center"><img src="docs/images/scroll.gif" alt="Page Down moves a whole page and ctrl+d half a page, G jumps to the end where the end line shows, ctrl+u and Page Up move back and g returns to the top, the scrollbar's thumb and the count at its foot following"></p>
 
 The view keeps the selection in view, paging moves by the rows on screen
 (`Paging::View` keeps the cursor on its screen line instead), and an end line
