@@ -133,4 +133,5 @@ cargo run --example demo --features crossterm
 ```
 
 Move with the arrows or `j` and `k`, press `v` for a range, ctrl+d and ctrl+u
-to page, `g` and `G` for the ends, enter to open, and ctrl+c twice to quit.
+for half a page, Page Down and Page Up for a whole one, `g` and `G` for the
+ends, enter to open, and ctrl+c twice to quit.

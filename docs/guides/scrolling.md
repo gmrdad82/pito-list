@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-![ctrl+d pages down twice, G jumps to the end where the end line shows, ctrl+u pages up and g goes back to the top, the scrollbar's thumb and the count at its foot following](../images/scroll.gif)
+![the keys page down twice, G jumps to the end where the end line shows, the keys page up and g goes back to the top, the scrollbar's thumb and the count at its foot following](../images/scroll.gif)
 
 The view always keeps the selection in view. A scrollbar and a count of the
 rows on screen are opt-in, and both show only when the list overflows: a list
