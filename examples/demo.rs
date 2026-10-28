@@ -5,10 +5,11 @@ use std::time::{Duration, Instant};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use pito_footer::{Guard, QuitGuard, Wording};
 use pito_list::{
-    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Part, Place, Row, Step, Styles,
+    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Part, Place, Row, Step, Styles, cut,
 };
 use ratatui::{
     DefaultTerminal, Frame,
+    buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier, Style},
 };
@@ -18,7 +19,8 @@ const FAINT: Style = Style::new().add_modifier(Modifier::DIM);
 const TICK: Duration = Duration::from_millis(120);
 const NOTE: Style = Style::new().fg(Color::Cyan);
 const COUNT: Count = Count::new("–", " of ").place(Place::Foot);
-const HINTS: &str = "↑↓ j k move · v range · enter open · ctrl+c twice quit";
+const HINTS: &str =
+    "↑↓ j k move · ctrl+c twice quit · ^d ^u half · pgdn pgup page · v range · enter open";
 
 const COLUMNS: [Column; 5] = [
     Column::new("Job", 10, 16).pinned(),
@@ -245,11 +247,7 @@ impl App {
             (None, None, Some(index)) => (format!("opened {}", self.name(index)), NOTE),
             (None, None, None) => (String::new(), NOTE),
         };
-        let line = area.bottom() - 1;
-        let width = u16::try_from(note.chars().count()).unwrap_or(0);
-        let buffer = frame.buffer_mut();
-        buffer.set_string(area.x + 2, line, HINTS, FAINT);
-        buffer.set_string(area.right().saturating_sub(width + 2), line, &note, style);
+        foot(frame.buffer_mut(), area, &note, style);
     }
 
     fn name(&self, index: usize) -> &str {
@@ -259,6 +257,22 @@ impl App {
             .and_then(|row| row.cells().first())
             .map_or("", Cell::text)
     }
+}
+
+fn legend(room: usize) -> String {
+    match cut(HINTS, room) {
+        None => HINTS.to_owned(),
+        Some(kept) => format!("{kept}…"),
+    }
+}
+
+fn foot(buffer: &mut Buffer, area: Rect, note: &str, style: Style) {
+    let line = area.bottom() - 1;
+    let width = u16::try_from(note.chars().count()).unwrap_or(0);
+    let at = area.right().saturating_sub(width + 2);
+    let room = usize::from(at.saturating_sub(area.x + 3));
+    buffer.set_stringn(area.x + 2, line, legend(room), room, FAINT);
+    buffer.set_string(at, line, note, style);
 }
 
 fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -285,4 +299,103 @@ fn main() -> io::Result<()> {
     let result = run(&mut terminal);
     ratatui::restore();
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width)
+            .map(|x| buffer[(x, y)].symbol().to_owned())
+            .collect()
+    }
+
+    fn footer(width: u16, note: &str) -> String {
+        let area = Rect::new(0, 0, width, 3);
+        let mut buffer = Buffer::empty(area);
+        foot(&mut buffer, area, note, NOTE);
+        assert_eq!(line(&buffer, 0), " ".repeat(usize::from(width)));
+        assert_eq!(line(&buffer, 1), " ".repeat(usize::from(width)));
+        line(&buffer, 2)
+    }
+
+    #[test]
+    fn the_legend_fits_whole_when_there_is_room() {
+        assert_eq!(legend(HINTS.chars().count()), HINTS);
+        assert_eq!(legend(200), HINTS);
+    }
+
+    #[test]
+    fn the_legend_ends_in_a_whole_word_and_an_ellipsis_when_short_of_room() {
+        for room in 1..HINTS.chars().count() {
+            let shown = legend(room);
+            assert!(shown.chars().count() <= room, "room {room}: {shown}");
+            let body = shown.strip_suffix('…').expect("an ellipsis");
+            assert!(HINTS.starts_with(body), "room {room}: {shown}");
+            assert!(
+                body.is_empty() || HINTS[body.len()..].starts_with(' '),
+                "room {room}: cut mid-word: {shown}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_legend_is_an_ellipsis_alone_when_no_whole_word_fits() {
+        assert_eq!(legend(1), "…");
+        assert_eq!(legend(2), "…");
+        assert_eq!(legend(3), "…");
+        assert_eq!(legend(4), "…");
+        assert_eq!(legend(5), "↑↓ j…");
+    }
+
+    #[test]
+    fn an_eighty_column_terminal_keeps_the_quit_hint() {
+        let text = footer(80, "");
+        assert!(text.contains("ctrl+c twice quit"), "{text}");
+        assert!(text.trim_end().ends_with('…'), "{text}");
+    }
+
+    #[test]
+    fn an_eighty_column_terminal_keeps_the_quit_hint_beside_a_note() {
+        let text = footer(80, "range Alpha … Bravo");
+        assert!(text.contains("ctrl+c twice quit"), "{text}");
+        assert!(text.ends_with("range Alpha … Bravo  "), "{text}");
+    }
+
+    #[test]
+    fn a_wide_terminal_shows_the_whole_legend_and_the_note_at_the_right_edge() {
+        let text = footer(120, "opened Alpha");
+        assert!(text.starts_with(&format!("  {HINTS}")));
+        assert!(text.ends_with("opened Alpha  "));
+    }
+
+    #[test]
+    fn a_narrow_terminal_cuts_the_legend_before_the_note_never_mid_word() {
+        let note = "range Alpha … Bravo";
+        let text = footer(60, note);
+        assert!(text.ends_with(&format!("{note}  ")));
+        let left: String = text.chars().take(39).collect();
+        let shown = left.trim();
+        assert!(shown.chars().count() <= 36);
+        let body = shown.strip_suffix('…').expect("an ellipsis");
+        assert!(HINTS.starts_with(body));
+        assert!(HINTS[body.len()..].starts_with(' '));
+    }
+
+    #[test]
+    fn a_note_as_wide_as_the_line_leaves_no_room_for_the_legend() {
+        let note = "x".repeat(20);
+        assert_eq!(footer(24, &note), format!("  {note}  "));
+    }
+
+    #[test]
+    fn a_note_wider_than_the_line_draws_from_the_left_without_a_legend() {
+        assert_eq!(footer(10, &"y".repeat(30)), "y".repeat(10));
+    }
+
+    #[test]
+    fn no_note_leaves_the_legend_alone() {
+        assert_eq!(footer(120, "").trim_end(), format!("  {HINTS}"));
+    }
 }

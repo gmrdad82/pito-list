@@ -7,6 +7,8 @@ const UP: &[Key] = &[Key::Char('k')];
 const DOWN: &[Key] = &[Key::Char('j')];
 const PAGE_UP: &[Key] = &[Key::Ctrl('b')];
 const PAGE_DOWN: &[Key] = &[Key::Ctrl('f')];
+const HALF_UP: &[Key] = &[Key::Ctrl('p')];
+const HALF_DOWN: &[Key] = &[Key::Ctrl('n')];
 const FIRST: &[Key] = &[Key::Char('<')];
 const LAST: &[Key] = &[Key::Char('>')];
 const OPEN: &[Key] = &[Key::Char('o'), Key::Char(' ')];
@@ -17,6 +19,8 @@ fn remapped() -> Keys {
         .down(DOWN)
         .page_up(PAGE_UP)
         .page_down(PAGE_DOWN)
+        .half_up(HALF_UP)
+        .half_down(HALF_DOWN)
         .first(FIRST)
         .last(LAST)
         .open(OPEN)
@@ -33,6 +37,8 @@ fn the_builders_replace_each_map_and_the_default_is_new() {
     assert_eq!(keys.down, DOWN);
     assert_eq!(keys.page_up, PAGE_UP);
     assert_eq!(keys.page_down, PAGE_DOWN);
+    assert_eq!(keys.half_up, HALF_UP);
+    assert_eq!(keys.half_down, HALF_DOWN);
     assert_eq!(keys.first, FIRST);
     assert_eq!(keys.last, LAST);
     assert_eq!(keys.open, OPEN);

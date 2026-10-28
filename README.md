@@ -65,15 +65,16 @@ release note above). Widths are Unicode-aware, so diacritics, wide glyphs and
 
 ## Scrolling, paging, a scrollbar and a count
 
-<p align="center"><img src="docs/images/scroll.gif" alt="ctrl+d pages down twice, G jumps to the end where the end line shows, ctrl+u pages up and g goes back to the top, the scrollbar's thumb and the count at its foot following"></p>
+<p align="center"><img src="docs/images/scroll.gif" alt="the keys page down twice, G jumps to the end where the end line shows, the keys page up and g goes back to the top, the scrollbar's thumb and the count at its foot following"></p>
 
 The view keeps the selection in view, paging moves by the rows on screen
 (`Paging::View` keeps the cursor on its screen line instead), and an end line
 scrolls in after the last row. `ListView::scrollbar(Some(Bar::LINE))` draws a
 slim bar with half-cell steps, and `ListView::count(..)` writes "1–13 of 25" in
 your words and number format, both only when the list overflows. Keys come in
-as the crate's own `Key` (arrows, page keys, home, end and enter, or
-`Keys::VIM` for j/k, g/G and ctrl+u/ctrl+d) and go out as a `Step`; `hit`
+as the crate's own `Key` (arrows, ctrl+d and ctrl+u for half a page, Page Down
+and Page Up for a whole one, home, end and enter, or `Keys::VIM` for j/k and
+g/G) and go out as a `Step`; `hit`
 names the row under a mouse click.
 
 ## Rows rewritten in place
@@ -237,7 +238,8 @@ cargo run --example demo --features crossterm
 The demo is the clip at the top: sample jobs in three sections under a styled
 header, sizes that grow and warm in place, the view following the selection
 with a scrollbar and the rows on screen counted at its foot, `v` for a range,
-ctrl+d and ctrl+u to page, `g` and `G` for the ends, enter to open and ctrl+c
+ctrl+d and ctrl+u for half a page, Page Down and Page Up for a whole one, `g`
+and `G` for the ends, enter to open and ctrl+c
 twice to quit, as in every PITO MD terminal app (the quit guard comes from
 [pito-footer](https://github.com/gmrdad82/pito-footer)). Every clip and still
 on this page is recorded from it with

@@ -28,3 +28,4 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm",
 [[example]]
 name = "demo"
 required-features = ["crossterm"]
+test = true
