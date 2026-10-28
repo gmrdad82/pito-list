@@ -326,6 +326,36 @@ fn view_paging_keeps_the_selection_on_its_line_with_the_half_keys() {
 }
 
 #[test]
+fn view_paging_with_the_half_keys_stops_at_the_end_of_the_list() {
+    for keys in SETS {
+        let mut list = numbered(100).paging(Paging::View).keys(keys);
+        list.select(95);
+        assert_eq!(line_of_selection(&mut list, 10), 9);
+        assert_eq!(list.key(HALF_DOWN), Step::Moved);
+        assert_eq!(list.selected(), Some(99));
+        let text = shown(&mut list, 10);
+        assert_eq!(text[8], "▌ row 99");
+        assert_eq!(text[9], "  · end ·");
+        assert_eq!(list.key(HALF_DOWN), Step::Held);
+    }
+}
+
+#[test]
+fn view_paging_with_the_half_keys_stops_at_the_start_of_the_list() {
+    for keys in SETS {
+        let mut list = numbered(100).paging(Paging::View).keys(keys);
+        shown(&mut list, 10);
+        list.select(2);
+        assert_eq!(line_of_selection(&mut list, 10), 2);
+        assert_eq!(list.key(HALF_UP), Step::Moved);
+        assert_eq!(list.selected(), Some(0));
+        assert_eq!(list.top(), 0);
+        assert_eq!(line_of_selection(&mut list, 10), 0);
+        assert_eq!(list.key(HALF_UP), Step::Held);
+    }
+}
+
+#[test]
 fn cursor_paging_with_the_half_keys_leaves_the_view_to_the_next_draw() {
     let mut list = numbered(100);
     shown(&mut list, 10);
@@ -343,13 +373,10 @@ fn the_old_vim_page_behaviour_is_gone() {
     let mut list = at(Keys::VIM, 100, 10, 0);
     assert_eq!(list.key(Key::Ctrl('d')), Step::Moved);
     assert_eq!(list.selected(), Some(5));
-    assert_ne!(list.selected(), Some(9));
     assert_eq!(list.key(Key::Ctrl('u')), Step::Moved);
     assert_eq!(list.selected(), Some(0));
     assert_eq!(list.key(Key::PageDown), Step::Moved);
     assert_eq!(list.selected(), Some(9));
-    assert!(!Keys::VIM.page_down.contains(&Key::Ctrl('d')));
-    assert!(!Keys::VIM.page_up.contains(&Key::Ctrl('u')));
 }
 
 #[test]

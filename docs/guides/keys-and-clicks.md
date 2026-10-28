@@ -52,8 +52,8 @@ assert_eq!(list.key(Key::Char('x')), Step::Pass);
 
 Paging moves by the rows on screen less one, and half a page is half of that
 rounded up, so the list needs one draw before the page keys know how far to
-go; here the 10-line area pages by 9 and half-pages by 5
-rows. `up`, `down`, `half_up`, `half_down`, `page_up`, `page_down`, `first`
+go; here the 10-line area pages by 9 and half-pages by
+5 rows. `up`, `down`, `half_up`, `half_down`, `page_up`, `page_down`, `first`
 and `last` do the same as their keys, for an app that maps its own.
 
 With the `crossterm` feature, `Key::from(event)` converts a crossterm

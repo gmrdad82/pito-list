@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use pito_footer::{Guard, QuitGuard, Wording};
 use pito_list::{
-    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Part, Place, Row, Step, Styles,
+    Bar, Cell, Column, Count, Key, Keys, List, ListView, Mark, Part, Place, Row, Step, Styles, cut,
 };
 use ratatui::{
     DefaultTerminal, Frame,
@@ -19,7 +19,7 @@ const TICK: Duration = Duration::from_millis(120);
 const NOTE: Style = Style::new().fg(Color::Cyan);
 const COUNT: Count = Count::new("–", " of ").place(Place::Foot);
 const HINTS: &str =
-    "↑↓ j k move · ^d ^u half page · pgdn pgup page · v range · enter open · ctrl+c twice quit";
+    "↑↓ j k move · ^d ^u half · pgdn pgup page · v range · enter open · ctrl+c twice quit";
 
 const COLUMNS: [Column; 5] = [
     Column::new("Job", 10, 16).pinned(),
@@ -251,7 +251,11 @@ impl App {
         let buffer = frame.buffer_mut();
         let at = area.right().saturating_sub(width + 2);
         let room = usize::from(at.saturating_sub(area.x + 3));
-        buffer.set_stringn(area.x + 2, line, HINTS, room, FAINT);
+        let legend = match cut(HINTS, room) {
+            None => HINTS.to_owned(),
+            Some(kept) => format!("{kept}…"),
+        };
+        buffer.set_stringn(area.x + 2, line, &legend, room, FAINT);
         buffer.set_string(at, line, &note, style);
     }
 

@@ -91,7 +91,8 @@ Everything the crate does, its whole API and a full example. The [README](../REA
   offset keeps the selection in view when the list is drawn, and an end line
   scrolls in with the last row; when one line is all there is, the selected
   row wins over the end line. `page_up`/`page_down` move by the drawn page
-  (one less than the rows on screen), `first`/`last` jump.
+  (one less than the rows on screen), `half_up`/`half_down` by half of it
+  (rounded up), `first`/`last` jump.
 - **Paging that keeps the view still.** By default (`Paging::Cursor`) paging
   moves the selection and the view follows it. With `paging(Paging::View)` the
   view moves by the same rows as the selection, so the selection stays on its
