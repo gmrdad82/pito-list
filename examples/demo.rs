@@ -344,7 +344,9 @@ mod tests {
     fn the_legend_is_an_ellipsis_alone_when_no_whole_word_fits() {
         assert_eq!(legend(1), "…");
         assert_eq!(legend(2), "…");
-        assert_eq!(legend(3), "↑↓…");
+        assert_eq!(legend(3), "…");
+        assert_eq!(legend(4), "…");
+        assert_eq!(legend(5), "↑↓ j…");
     }
 
     #[test]

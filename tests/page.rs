@@ -16,6 +16,13 @@ fn shown(list: &mut List, height: u16) -> Vec<String> {
     draw_with(list, &ONE, 20, height, |view| view.styles(STYLES)).text
 }
 
+fn ended(list: &mut List, height: u16) -> Vec<String> {
+    draw_with(list, &ONE, 20, height, |view| {
+        view.styles(STYLES).end(Some("· end ·"))
+    })
+    .text
+}
+
 fn line_of_selection(list: &mut List, height: u16) -> usize {
     let text = shown(list, height);
     let marker = format!("▌ row {}", list.selected().unwrap());
@@ -333,7 +340,7 @@ fn view_paging_with_the_half_keys_stops_at_the_end_of_the_list() {
         assert_eq!(line_of_selection(&mut list, 10), 9);
         assert_eq!(list.key(HALF_DOWN), Step::Moved);
         assert_eq!(list.selected(), Some(99));
-        let text = shown(&mut list, 10);
+        let text = ended(&mut list, 10);
         assert_eq!(text[8], "▌ row 99");
         assert_eq!(text[9], "  · end ·");
         assert_eq!(list.key(HALF_DOWN), Step::Held);
