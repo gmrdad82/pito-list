@@ -9,6 +9,7 @@ use pito_list::{
 };
 use ratatui::{
     DefaultTerminal, Frame,
+    buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier, Style},
 };
@@ -246,17 +247,7 @@ impl App {
             (None, None, Some(index)) => (format!("opened {}", self.name(index)), NOTE),
             (None, None, None) => (String::new(), NOTE),
         };
-        let line = area.bottom() - 1;
-        let width = u16::try_from(note.chars().count()).unwrap_or(0);
-        let buffer = frame.buffer_mut();
-        let at = area.right().saturating_sub(width + 2);
-        let room = usize::from(at.saturating_sub(area.x + 3));
-        let legend = match cut(HINTS, room) {
-            None => HINTS.to_owned(),
-            Some(kept) => format!("{kept}…"),
-        };
-        buffer.set_stringn(area.x + 2, line, &legend, room, FAINT);
-        buffer.set_string(at, line, &note, style);
+        foot(frame.buffer_mut(), area, &note, style);
     }
 
     fn name(&self, index: usize) -> &str {
@@ -266,6 +257,22 @@ impl App {
             .and_then(|row| row.cells().first())
             .map_or("", Cell::text)
     }
+}
+
+fn legend(room: usize) -> String {
+    match cut(HINTS, room) {
+        None => HINTS.to_owned(),
+        Some(kept) => format!("{kept}…"),
+    }
+}
+
+fn foot(buffer: &mut Buffer, area: Rect, note: &str, style: Style) {
+    let line = area.bottom() - 1;
+    let width = u16::try_from(note.chars().count()).unwrap_or(0);
+    let at = area.right().saturating_sub(width + 2);
+    let room = usize::from(at.saturating_sub(area.x + 3));
+    buffer.set_stringn(area.x + 2, line, legend(room), room, FAINT);
+    buffer.set_string(at, line, note, style);
 }
 
 fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -292,4 +299,86 @@ fn main() -> io::Result<()> {
     let result = run(&mut terminal);
     ratatui::restore();
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width)
+            .map(|x| buffer[(x, y)].symbol().to_owned())
+            .collect()
+    }
+
+    fn footer(width: u16, note: &str) -> String {
+        let area = Rect::new(0, 0, width, 3);
+        let mut buffer = Buffer::empty(area);
+        foot(&mut buffer, area, note, NOTE);
+        assert_eq!(line(&buffer, 0), " ".repeat(usize::from(width)));
+        assert_eq!(line(&buffer, 1), " ".repeat(usize::from(width)));
+        line(&buffer, 2)
+    }
+
+    #[test]
+    fn the_legend_names_the_half_and_whole_page_keys() {
+        assert!(HINTS.contains("^d ^u half"));
+        assert!(HINTS.contains("pgdn pgup page"));
+    }
+
+    #[test]
+    fn the_legend_fits_whole_when_there_is_room() {
+        assert_eq!(legend(HINTS.chars().count()), HINTS);
+        assert_eq!(legend(200), HINTS);
+    }
+
+    #[test]
+    fn the_legend_ends_in_a_whole_word_and_an_ellipsis_when_short_of_room() {
+        for room in 1..HINTS.chars().count() {
+            let shown = legend(room);
+            assert!(shown.chars().count() <= room, "room {room}: {shown}");
+            let body = shown.strip_suffix('…').expect("an ellipsis");
+            assert!(HINTS.starts_with(body), "room {room}: {shown}");
+            assert!(
+                HINTS[body.len()..].starts_with(' '),
+                "room {room}: cut mid-word: {shown}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_wide_terminal_shows_the_whole_legend_and_the_note_at_the_right_edge() {
+        let text = footer(120, "opened Alpha");
+        assert!(text.starts_with(&format!("  {HINTS}")));
+        assert!(text.ends_with("opened Alpha  "));
+    }
+
+    #[test]
+    fn a_narrow_terminal_cuts_the_legend_before_the_note_never_mid_word() {
+        let note = "range Alpha … Bravo";
+        let text = footer(60, note);
+        assert!(text.ends_with(&format!("{note}  ")));
+        let left: String = text.chars().take(39).collect();
+        let shown = left.trim();
+        assert!(shown.chars().count() <= 36);
+        let body = shown.strip_suffix('…').expect("an ellipsis");
+        assert!(HINTS.starts_with(body));
+        assert!(HINTS[body.len()..].starts_with(' '));
+    }
+
+    #[test]
+    fn a_note_as_wide_as_the_line_leaves_no_room_for_the_legend() {
+        let note = "x".repeat(20);
+        assert_eq!(footer(24, &note), format!("  {note}  "));
+    }
+
+    #[test]
+    fn a_note_wider_than_the_line_draws_from_the_left_without_a_legend() {
+        assert_eq!(footer(10, &"y".repeat(30)), "y".repeat(10));
+    }
+
+    #[test]
+    fn no_note_leaves_the_legend_alone() {
+        assert_eq!(footer(120, "").trim_end(), format!("  {HINTS}"));
+    }
 }
