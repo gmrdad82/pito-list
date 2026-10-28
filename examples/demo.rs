@@ -20,7 +20,7 @@ const TICK: Duration = Duration::from_millis(120);
 const NOTE: Style = Style::new().fg(Color::Cyan);
 const COUNT: Count = Count::new("–", " of ").place(Place::Foot);
 const HINTS: &str =
-    "↑↓ j k move · ^d ^u half · pgdn pgup page · v range · enter open · ctrl+c twice quit";
+    "↑↓ j k move · ctrl+c twice quit · ^d ^u half · pgdn pgup page · v range · enter open";
 
 const COLUMNS: [Column; 5] = [
     Column::new("Job", 10, 16).pinned(),
@@ -321,12 +321,6 @@ mod tests {
     }
 
     #[test]
-    fn the_legend_names_the_half_and_whole_page_keys() {
-        assert!(HINTS.contains("^d ^u half"));
-        assert!(HINTS.contains("pgdn pgup page"));
-    }
-
-    #[test]
     fn the_legend_fits_whole_when_there_is_room() {
         assert_eq!(legend(HINTS.chars().count()), HINTS);
         assert_eq!(legend(200), HINTS);
@@ -340,10 +334,31 @@ mod tests {
             let body = shown.strip_suffix('…').expect("an ellipsis");
             assert!(HINTS.starts_with(body), "room {room}: {shown}");
             assert!(
-                HINTS[body.len()..].starts_with(' '),
+                body.is_empty() || HINTS[body.len()..].starts_with(' '),
                 "room {room}: cut mid-word: {shown}"
             );
         }
+    }
+
+    #[test]
+    fn the_legend_is_an_ellipsis_alone_when_no_whole_word_fits() {
+        assert_eq!(legend(1), "…");
+        assert_eq!(legend(2), "…");
+        assert_eq!(legend(3), "↑↓…");
+    }
+
+    #[test]
+    fn an_eighty_column_terminal_keeps_the_quit_hint() {
+        let text = footer(80, "");
+        assert!(text.contains("ctrl+c twice quit"), "{text}");
+        assert!(text.trim_end().ends_with('…'), "{text}");
+    }
+
+    #[test]
+    fn an_eighty_column_terminal_keeps_the_quit_hint_beside_a_note() {
+        let text = footer(80, "range Alpha … Bravo");
+        assert!(text.contains("ctrl+c twice quit"), "{text}");
+        assert!(text.ends_with("range Alpha … Bravo  "), "{text}");
     }
 
     #[test]

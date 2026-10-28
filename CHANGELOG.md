@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `Keys::new()` now moves half a page with ctrl+d and ctrl+u. Apps on the default key set that read ctrl+d or ctrl+u themselves no longer see them: they used to get `Step::Pass`, and now the list consumes them.
+- `Keys::VIM`'s ctrl+d and ctrl+u move half a page instead of a whole page. Page Down and Page Up still move a whole page.
+- The demo's footer names the half and whole page keys, and puts "ctrl+c twice quit" right after the move keys, so an 80-column terminal keeps it.
+
 ## v1.2.1 — 2026-10-26
 
 ### Changed
