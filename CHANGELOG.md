@@ -8,6 +8,11 @@
 - `Keys::VIM`'s ctrl+d and ctrl+u move half a page instead of a whole page. Page Down and Page Up still move a whole page.
 - The demo's footer names the half and whole page keys, and puts "ctrl+c twice quit" right after the move keys, so an 80-column terminal keeps it.
 
+### Added
+
+- `Keys::half_up` and `Keys::half_down`, as fields and as builders, so an app picks its own half page keys or empties them.
+- `List::half_up` and `List::half_down`, which move by half the drawn page, rounded up and never less than one row.
+
 ## v1.2.1 — 2026-10-26
 
 ### Changed
