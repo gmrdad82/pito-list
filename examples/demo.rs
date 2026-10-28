@@ -18,7 +18,8 @@ const FAINT: Style = Style::new().add_modifier(Modifier::DIM);
 const TICK: Duration = Duration::from_millis(120);
 const NOTE: Style = Style::new().fg(Color::Cyan);
 const COUNT: Count = Count::new("–", " of ").place(Place::Foot);
-const HINTS: &str = "↑↓ j k move · v range · enter open · ctrl+c twice quit";
+const HINTS: &str =
+    "↑↓ j k move · ^d ^u half page · pgdn pgup page · v range · enter open · ctrl+c twice quit";
 
 const COLUMNS: [Column; 5] = [
     Column::new("Job", 10, 16).pinned(),
@@ -248,8 +249,10 @@ impl App {
         let line = area.bottom() - 1;
         let width = u16::try_from(note.chars().count()).unwrap_or(0);
         let buffer = frame.buffer_mut();
-        buffer.set_string(area.x + 2, line, HINTS, FAINT);
-        buffer.set_string(area.right().saturating_sub(width + 2), line, &note, style);
+        let at = area.right().saturating_sub(width + 2);
+        let room = usize::from(at.saturating_sub(area.x + 3));
+        buffer.set_stringn(area.x + 2, line, HINTS, room, FAINT);
+        buffer.set_string(at, line, &note, style);
     }
 
     fn name(&self, index: usize) -> &str {

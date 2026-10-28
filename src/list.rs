@@ -13,6 +13,8 @@ pub struct Keys {
     pub down: &'static [Key],
     pub page_up: &'static [Key],
     pub page_down: &'static [Key],
+    pub half_up: &'static [Key],
+    pub half_down: &'static [Key],
     pub first: &'static [Key],
     pub last: &'static [Key],
     pub open: &'static [Key],
@@ -25,6 +27,8 @@ impl Keys {
             down: &[Key::Down],
             page_up: &[Key::PageUp],
             page_down: &[Key::PageDown],
+            half_up: &[Key::Ctrl('u')],
+            half_down: &[Key::Ctrl('d')],
             first: &[Key::Home],
             last: &[Key::End],
             open: &[Key::Enter],
@@ -34,8 +38,10 @@ impl Keys {
     pub const VIM: Keys = Keys {
         up: &[Key::Up, Key::Char('k')],
         down: &[Key::Down, Key::Char('j')],
-        page_up: &[Key::PageUp, Key::Ctrl('u')],
-        page_down: &[Key::PageDown, Key::Ctrl('d')],
+        page_up: &[Key::PageUp],
+        page_down: &[Key::PageDown],
+        half_up: &[Key::Ctrl('u')],
+        half_down: &[Key::Ctrl('d')],
         first: &[Key::Home, Key::Char('g')],
         last: &[Key::End, Key::Char('G')],
         open: &[Key::Enter],
@@ -58,6 +64,16 @@ impl Keys {
 
     pub const fn page_down(mut self, keys: &'static [Key]) -> Self {
         self.page_down = keys;
+        self
+    }
+
+    pub const fn half_up(mut self, keys: &'static [Key]) -> Self {
+        self.half_up = keys;
+        self
+    }
+
+    pub const fn half_down(mut self, keys: &'static [Key]) -> Self {
+        self.half_down = keys;
         self
     }
 
@@ -408,16 +424,32 @@ impl<S: Source> List<S> {
     }
 
     pub fn page_up(&mut self) -> Step {
+        self.hop_up(self.page)
+    }
+
+    pub fn page_down(&mut self) -> Step {
+        self.hop_down(self.page)
+    }
+
+    pub fn half_up(&mut self) -> Step {
+        self.hop_up(self.page.div_ceil(2))
+    }
+
+    pub fn half_down(&mut self) -> Step {
+        self.hop_down(self.page.div_ceil(2))
+    }
+
+    fn hop_up(&mut self, rows: usize) -> Step {
         self.flip(|list, from| {
-            let to = from.saturating_sub(list.page);
+            let to = from.saturating_sub(rows);
             list.prev(to).or_else(|| list.next(to))
         })
     }
 
-    pub fn page_down(&mut self) -> Step {
+    fn hop_down(&mut self, rows: usize) -> Step {
         self.flip(|list, from| {
             let to = from
-                .saturating_add(list.page)
+                .saturating_add(rows)
                 .min(list.source.len().saturating_sub(1));
             list.next(to).or_else(|| list.prev(to))
         })
@@ -455,6 +487,10 @@ impl<S: Source> List<S> {
             self.page_up()
         } else if keys.page_down.contains(&key) {
             self.page_down()
+        } else if keys.half_up.contains(&key) {
+            self.half_up()
+        } else if keys.half_down.contains(&key) {
+            self.half_down()
         } else if keys.first.contains(&key) {
             self.first()
         } else if keys.last.contains(&key) {

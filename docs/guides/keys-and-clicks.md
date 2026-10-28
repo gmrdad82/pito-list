@@ -20,9 +20,11 @@ click landed on.
 | `Open(index)` | the open key, with the selected row's index |
 | `Pass` | a key that isn't the list's, left for your app |
 
-The keys are a `Keys` set. `Keys::new()`, the default, is the arrows, page up
-and page down, home, end and enter. `Keys::VIM` adds `j` and `k`, `g` and `G`
-for the ends and ctrl+u and ctrl+d to page. Any part of a set can be replaced:
+The keys are a `Keys` set. `Keys::new()`, the default, is the arrows, ctrl+u
+and ctrl+d for half a page, page up and page down for a whole one, home, end
+and enter. `Keys::VIM` adds `j` and `k`, and `g` and `G` for the ends. The
+parts are `up`, `down`, `half_up`, `half_down`, `page_up`, `page_down`,
+`first`, `last` and `open`, and any of them can be replaced:
 
 ```rust
 use pito_list::{Column, Key, Keys, List, ListView, Row, Step};
@@ -40,16 +42,19 @@ ListView::new(&mut list, &columns).render(area, &mut Buffer::empty(area));
 assert_eq!(list.key(Key::Char('k')), Step::Held);
 assert_eq!(list.key(Key::Char('j')), Step::Moved);
 assert_eq!(list.key(Key::Ctrl('d')), Step::Moved);
-assert_eq!(list.selected(), Some(10));
+assert_eq!(list.selected(), Some(6));
+assert_eq!(list.key(Key::PageDown), Step::Moved);
+assert_eq!(list.selected(), Some(15));
 assert_eq!(list.key(Key::Char('G')), Step::Moved);
 assert_eq!(list.key(Key::Char('o')), Step::Open(39));
 assert_eq!(list.key(Key::Char('x')), Step::Pass);
 ```
 
-Paging moves by the rows on screen less one, so the list needs one draw
-before the page keys know how far to go; here the 10-line area pages by 9
-rows. `up`, `down`, `page_up`, `page_down`, `first` and `last` do the same as
-their keys, for an app that maps its own.
+Paging moves by the rows on screen less one, and half a page is half of that
+rounded up, so the list needs one draw before the page keys know how far to
+go; here the 10-line area pages by 9 and half-pages by 5
+rows. `up`, `down`, `half_up`, `half_down`, `page_up`, `page_down`, `first`
+and `last` do the same as their keys, for an app that maps its own.
 
 With the `crossterm` feature, `Key::from(event)` converts a crossterm
 `KeyEvent`. Alt, Super, Meta or Hyper on a key that isn't a character gives

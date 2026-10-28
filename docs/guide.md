@@ -213,8 +213,9 @@ Everything the crate does, its whole API and a full example. The [README](../REA
   returns a `Step`: `Moved`, `Held` (a list key that moved nothing, such as up
   on the first row), `Open(index)` for the open key, or `Pass` for a key that
   isn't the list's. It never reads input itself. The keys are the app's:
-  `Keys::new()` is the arrows, page keys, home, end and enter, `Keys::VIM` adds
-  j/k, g/G and ctrl+u/ctrl+d, and any set can be replaced.
+  `Keys::new()` is the arrows, ctrl+u/ctrl+d for half a page, the page keys for
+  a whole one, home, end and enter, `Keys::VIM` adds j/k and g/G, and any set
+  can be replaced.
 - **Clicks.** `List::hit(area, header, column, row)` names the row under a
   terminal cell, following the scroll, or `None` for the header, a section,
   the end line, a blank line, the scrollbar's column or the count's line.
@@ -251,8 +252,8 @@ Mark::new(text);                              .faint() .style(Style); text(), se
 Row::new(cells).mark(Mark) | Row::heading(parts) | Row::blank();
   cells(), cells_mut() -> &mut [Cell], leading(), leading_mut() -> Option<&mut Mark>, selectable()
 Column::new(title, min, preferred).priority(u8).pinned().right().flex().fit(max: u16)
-pub struct Keys { up, down, page_up, page_down, first, last, open: &'static [Key] }   // non_exhaustive
-  Keys::new(), Keys::VIM; .up(..) .down(..) .page_up(..) .page_down(..) .first(..) .last(..) .open(..)
+pub struct Keys { up, down, page_up, page_down, half_up, half_down, first, last, open: &'static [Key] }   // non_exhaustive
+  Keys::new(), Keys::VIM; .up(..) .down(..) .page_up(..) .page_down(..) .half_up(..) .half_down(..) .first(..) .last(..) .open(..)
 pub enum Step { Pass, Held, Moved, Open(usize) }                                      // non_exhaustive
 pub enum Paging { Cursor, View }                                                      // non_exhaustive
 pub struct Bar<'a> { track, thumb, halves }                                           // non_exhaustive
@@ -281,7 +282,7 @@ List::from_source(source).keys(Keys).paging(Paging)             // List<S> for a
   shown() -> Option<(usize, usize, usize)>     // first and last row on screen and the length, from 1
   position() -> Option<(usize, usize)>         // the selected row from 1 and the length
   select_range(Option<(usize, usize)>), range() -> Option<(usize, usize)>
-  up(), down(), page_up(), page_down(), first(), last() -> Step
+  up(), down(), page_up(), page_down(), half_up(), half_down(), first(), last() -> Step
   key(Key) -> Step
   hit(area, header, column, row) -> Option<usize>
 ListView::new(&mut List<S>, &[Column])         // Widget
