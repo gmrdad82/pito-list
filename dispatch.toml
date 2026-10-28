@@ -1,0 +1,15 @@
+name = "pito-list"
+
+[gate]
+fast = "bin/gate --fast"
+full = "bin/gate"
+
+[[test_track.jobs]]
+name = "gate"
+command = "bin/gate"
+host = "linux"
+
+[[test_track.jobs]]
+name = "mac"
+command = "bin/gate --fast"
+host = "mac"
