@@ -97,7 +97,7 @@ pito-list reaches 1.0.0 with the same API as 0.8.0: nothing to change in your co
 
 ### Changed
 
-- The licence's copyright line carries the owner's legal name with its diacritics, Cătălin Ilinca.
+- The licence's copyright line carries the legal name with its diacritics, Cătălin Ilinca.
 
 ## v0.6.1 — 2026-10-06
 
