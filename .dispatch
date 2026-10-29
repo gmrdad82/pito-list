@@ -7,9 +7,9 @@ full = "bin/gate"
 [[test_track.jobs]]
 name = "gate"
 command = "bin/gate"
-host = "linux"
+host = "os:linux"
 
 [[test_track.jobs]]
 name = "mac"
 command = "bin/gate --fast"
-host = "mac"
+host = "os:macos"
