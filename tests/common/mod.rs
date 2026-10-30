@@ -47,7 +47,7 @@ pub fn operations() -> Vec<Row> {
             "v5 → v6",
             "billing",
             "stopped",
-            "stopped by the owner",
+            "stopped on request",
         ),
     ];
     data.iter()

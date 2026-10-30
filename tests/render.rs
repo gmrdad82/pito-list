@@ -14,7 +14,7 @@ fn eighty_columns_pad_align_and_clip() {
             "▌ ⧗ deploy api        v1 → v2       billing   running   uploading the bundle",
             "  ✓ update tool       0.1 → 0.2     tools     done      finished",
             "  ✗ install app       v3 → v4       design    failed    exit 1: the build could…",
-            "  ■ release           v5 → v6       billing   stopped   stopped by the owner",
+            "  ■ release           v5 → v6       billing   stopped   stopped on request",
             "  · end ·",
             "",
             "",
